@@ -357,7 +357,7 @@ chainlit run app.py
 
 이 프로젝트는 **AI 개발자 Mickey**를 활용하여 만들어졌습니다.
 
-Mickey는 세션 간 지속성을 유지하며 점진적으로 개선되는 AI 개발 에이전트입니다. 저장소에 포함된 `MICKEY-*-SESSION.md` 파일들은 Mickey가 이 프로젝트를 개발하면서 남긴 세션 기록입니다.
+Mickey는 Kiro CLI용 커스텀 Agent로, 세션 간 지속성을 유지하며 점진적으로 개선되는 AI 개발 에이전트입니다. 저장소에 포함된 `MICKEY-*-SESSION.md` 파일들은 Mickey가 이 프로젝트를 개발하면서 남긴 세션 기록입니다.
 
 Mickey에 대해 더 알아보기: [github.com/hcsung-aws/ai-developer-mickey](https://github.com/hcsung-aws/ai-developer-mickey)
 
