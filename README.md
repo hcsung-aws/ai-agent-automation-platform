@@ -323,10 +323,11 @@ chainlit run app.py
 - [x] 피드백 조회 API + 대시보드
 - [x] 중복 방지 + 변경 기능
 
-### v1.2 - Agent Builder Agent ⭐ (진행 예정)
-- [ ] 자연어로 도구 생성: *"휴가 신청 도구 만들어줘"*
-- [ ] 자연어로 Agent 생성: *"HR Agent 만들어줘"*
-- [ ] Supervisor 자동 연결
+### v1.2 - Agent Builder Agent ⭐ (진행 중)
+- [x] Agent Builder Kiro Agent 구현 (`~/.kiro/agents/agent-builder.json`)
+- [x] 생성 가이드 작성 (`context_rule/agent-builder-guide.md`)
+- [ ] 자연어로 Agent 생성 테스트: *"HR Agent 만들어줘"*
+- [ ] Supervisor 자동 연결 검증
 
 ### v1.3 - 자동 개선 제안 (피드백 축적 후)
 - [ ] 실패 패턴 분석
@@ -468,10 +469,11 @@ See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for AWS deployment.
 - [x] Feedback API + dashboard
 - [x] Duplicate prevention + change feature
 
-### v1.2 - Agent Builder Agent ⭐ (Next)
-- [ ] Create tools with natural language: *"Create a leave request tool"*
-- [ ] Create Agents with natural language: *"Create an HR Agent"*
-- [ ] Auto-connect to Supervisor
+### v1.2 - Agent Builder Agent ⭐ (In Progress)
+- [x] Agent Builder Kiro Agent (`~/.kiro/agents/agent-builder.json`)
+- [x] Builder guide (`context_rule/agent-builder-guide.md`)
+- [ ] Test Agent creation: *"Create an HR Agent"*
+- [ ] Verify Supervisor auto-connection
 
 ### v1.3 - Auto Improvement Suggestions (After feedback accumulation)
 - [ ] Failure pattern analysis
