@@ -321,7 +321,12 @@ chainlit run app.py
 - [ ] 피드백 수집 기능
 - [ ] KB 문서 자동 제안
 
-### v2.0 - 프로덕션
+### v2.0 - Agent Builder Agent ⭐
+- [ ] 자연어로 도구 생성: *"휴가 신청 도구 만들어줘"*
+- [ ] 자연어로 Agent 생성: *"HR Agent 만들어줘"*
+- [ ] 자연어로 개선 실행: *"실패 로그 분석해서 KB 업데이트해줘"*
+
+### v3.0 - 프로덕션
 - [ ] 인증/권한 관리
 - [ ] AgentCore 런타임 배포
 
@@ -450,7 +455,12 @@ See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for AWS deployment.
 - [ ] Feedback collection
 - [ ] KB document suggestions
 
-### v2.0 - Production
+### v2.0 - Agent Builder Agent ⭐
+- [ ] Create tools with natural language: *"Create a leave request tool"*
+- [ ] Create Agents with natural language: *"Create an HR Agent"*
+- [ ] Run improvements with natural language: *"Analyze failure logs and update KB"*
+
+### v3.0 - Production
 - [ ] Authentication/Authorization
 - [ ] AgentCore runtime deployment
 
