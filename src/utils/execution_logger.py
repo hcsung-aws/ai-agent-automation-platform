@@ -6,9 +6,11 @@ from typing import Optional
 
 REGION = "us-east-1"
 TABLE_NAME = "execution-logs"
+FEEDBACK_TABLE_NAME = "agent-feedback"
 
 dynamodb = boto3.resource("dynamodb", region_name=REGION)
 table = dynamodb.Table(TABLE_NAME)
+feedback_table = dynamodb.Table(FEEDBACK_TABLE_NAME)
 
 
 def generate_session_id() -> str:
@@ -95,3 +97,76 @@ def get_recent_logs(limit: int = 20) -> list[dict]:
     response = table.scan(Limit=limit)
     items = response.get("Items", [])
     return sorted(items, key=lambda x: x.get("timestamp", ""), reverse=True)
+
+
+def generate_message_id() -> str:
+    """Generate unique message ID for feedback tracking."""
+    return str(uuid.uuid4())
+
+
+def log_feedback(
+    session_id: str,
+    message_id: str,
+    rating: str,
+    user_input: str,
+    agent_response: str,
+    comment: Optional[str] = None,
+) -> dict:
+    """Log user feedback to DynamoDB.
+    
+    Args:
+        session_id: Session identifier
+        message_id: Unique message identifier
+        rating: 'positive' or 'negative'
+        user_input: Original user input
+        agent_response: Agent's response that was rated
+        comment: Optional user comment
+    
+    Returns:
+        Logged feedback item
+    """
+    timestamp = datetime.utcnow().isoformat() + "Z"
+    
+    item = {
+        "session_id": session_id,
+        "message_id": message_id,
+        "timestamp": timestamp,
+        "rating": rating,
+        "user_input": user_input[:1000],
+        "agent_response": agent_response[:2000],
+    }
+    
+    if comment:
+        item["comment"] = comment[:500]
+    
+    try:
+        feedback_table.put_item(Item=item)
+    except Exception:
+        pass  # Skip if table doesn't exist
+    
+    return item
+
+
+def get_feedback(limit: int = 50, rating_filter: Optional[str] = None) -> list[dict]:
+    """Get feedback entries.
+    
+    Args:
+        limit: Maximum number of entries
+        rating_filter: Filter by 'positive' or 'negative'
+    
+    Returns:
+        List of feedback entries
+    """
+    try:
+        if rating_filter:
+            response = feedback_table.scan(
+                FilterExpression="rating = :r",
+                ExpressionAttributeValues={":r": rating_filter},
+                Limit=limit,
+            )
+        else:
+            response = feedback_table.scan(Limit=limit)
+        items = response.get("Items", [])
+        return sorted(items, key=lambda x: x.get("timestamp", ""), reverse=True)
+    except Exception:
+        return []

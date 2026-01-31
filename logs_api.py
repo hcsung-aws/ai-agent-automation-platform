@@ -1,7 +1,7 @@
-"""Simple API for viewing execution logs."""
+"""Simple API for viewing execution logs and feedback."""
 from fastapi import FastAPI, Query
 from fastapi.responses import HTMLResponse
-from src.utils.execution_logger import get_session_logs, get_recent_logs
+from src.utils.execution_logger import get_session_logs, get_recent_logs, get_feedback
 
 app = FastAPI(title="Agent Execution Logs")
 
@@ -84,6 +84,85 @@ async def api_session_logs(session_id: str, limit: int = Query(50)):
     """Get logs for specific session."""
     logs = get_session_logs(session_id, limit=limit)
     return {"session_id": session_id, "logs": logs, "count": len(logs)}
+
+
+@app.get("/api/feedback")
+async def api_feedback(
+    rating: str = Query(None, description="Filter by rating: positive or negative"),
+    limit: int = Query(50, description="Max results"),
+):
+    """Get feedback entries."""
+    feedback = get_feedback(limit=limit, rating_filter=rating)
+    return {"feedback": feedback, "count": len(feedback)}
+
+
+@app.get("/feedback", response_class=HTMLResponse)
+async def feedback_page():
+    """Feedback dashboard page."""
+    feedback = get_feedback(limit=100)
+    positive = [f for f in feedback if f.get("rating") == "positive"]
+    negative = [f for f in feedback if f.get("rating") == "negative"]
+    
+    html = """
+    <html>
+    <head>
+        <title>Agent Feedback</title>
+        <style>
+            body { font-family: Arial, sans-serif; margin: 20px; }
+            .stats { display: flex; gap: 20px; margin-bottom: 20px; }
+            .stat-box { padding: 20px; border-radius: 8px; text-align: center; }
+            .positive { background: #d4edda; color: #155724; }
+            .negative { background: #f8d7da; color: #721c24; }
+            table { border-collapse: collapse; width: 100%; margin-top: 20px; }
+            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+            th { background-color: #6c757d; color: white; }
+            .truncate { max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        </style>
+    </head>
+    <body>
+        <h1>📊 Agent Feedback Dashboard</h1>
+        <div class="stats">
+            <div class="stat-box positive">
+                <h2>👍 """ + str(len(positive)) + """</h2>
+                <p>Positive</p>
+            </div>
+            <div class="stat-box negative">
+                <h2>👎 """ + str(len(negative)) + """</h2>
+                <p>Negative</p>
+            </div>
+        </div>
+        
+        <h2>Recent Feedback</h2>
+        <table>
+            <tr>
+                <th>Time</th>
+                <th>Rating</th>
+                <th>User Input</th>
+                <th>Comment</th>
+            </tr>
+    """
+    
+    for f in feedback[:50]:
+        rating_emoji = "👍" if f.get("rating") == "positive" else "👎"
+        comment = f.get("comment", "-") or "-"
+        user_input = f.get("user_input", "")[:50]
+        
+        html += f"""
+            <tr>
+                <td>{f.get('timestamp', '')[:19]}</td>
+                <td>{rating_emoji}</td>
+                <td class="truncate">{user_input}</td>
+                <td class="truncate">{comment}</td>
+            </tr>
+        """
+    
+    html += """
+        </table>
+        <p><a href="/">← Back to Logs</a> | <a href="/api/feedback">View JSON API</a></p>
+    </body>
+    </html>
+    """
+    return html
 
 
 if __name__ == "__main__":

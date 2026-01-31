@@ -311,20 +311,31 @@ chainlit run app.py
 
 상세 계획: [docs/ROADMAP.md](docs/ROADMAP.md)
 
-### v1.0 (현재) - 기본 템플릿
+### v1.0 - 기본 템플릿 ✅
 - [x] Multi-Agent 협업 구조
 - [x] 실행 기록 저장
 - [x] CDK/Terraform 배포 스크립트
 - [x] PoC 예시 (DevOps + Analytics)
 
-### v1.1 - 개선 사이클 완성
-- [ ] 피드백 수집 기능
-- [ ] KB 문서 자동 제안
+### v1.1 - 피드백 수집 ✅
+- [x] 👍/👎 피드백 버튼
+- [x] 피드백 저장 (DynamoDB)
+- [x] 피드백 조회 API + 대시보드
+- [x] 중복 방지 + 변경 기능
 
-### v2.0 - Agent Builder Agent ⭐
+### v1.2 - Agent Builder Agent ⭐ (진행 예정)
 - [ ] 자연어로 도구 생성: *"휴가 신청 도구 만들어줘"*
 - [ ] 자연어로 Agent 생성: *"HR Agent 만들어줘"*
-- [ ] 자연어로 개선 실행: *"실패 로그 분석해서 KB 업데이트해줘"*
+- [ ] Supervisor 자동 연결
+
+### v1.3 - 자동 개선 제안 (피드백 축적 후)
+- [ ] 실패 패턴 분석
+- [ ] KB 문서 자동 제안
+- [ ] System Prompt 개선 제안
+
+### v2.0 - 자동화 워크플로우
+- [ ] 스케줄러 (일/주간 자동 분석)
+- [ ] 알림 연동 (Slack/이메일)
 
 ### v3.0 - 프로덕션
 - [ ] 인증/권한 관리
@@ -445,20 +456,31 @@ See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for AWS deployment.
 
 ## Roadmap
 
-### v1.0 (Current) - Basic Template
+### v1.0 - Basic Template ✅
 - [x] Multi-Agent collaboration
 - [x] Execution logging
 - [x] CDK/Terraform deployment
 - [x] PoC example
 
-### v1.1 - Complete Improvement Cycle
-- [ ] Feedback collection
-- [ ] KB document suggestions
+### v1.1 - Feedback Collection ✅
+- [x] 👍/👎 feedback buttons
+- [x] Feedback storage (DynamoDB)
+- [x] Feedback API + dashboard
+- [x] Duplicate prevention + change feature
 
-### v2.0 - Agent Builder Agent ⭐
+### v1.2 - Agent Builder Agent ⭐ (Next)
 - [ ] Create tools with natural language: *"Create a leave request tool"*
 - [ ] Create Agents with natural language: *"Create an HR Agent"*
-- [ ] Run improvements with natural language: *"Analyze failure logs and update KB"*
+- [ ] Auto-connect to Supervisor
+
+### v1.3 - Auto Improvement Suggestions (After feedback accumulation)
+- [ ] Failure pattern analysis
+- [ ] KB document suggestions
+- [ ] System Prompt improvement suggestions
+
+### v2.0 - Automation Workflow
+- [ ] Scheduler (daily/weekly auto-analysis)
+- [ ] Notifications (Slack/email)
 
 ### v3.0 - Production
 - [ ] Authentication/Authorization
