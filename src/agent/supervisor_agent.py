@@ -6,6 +6,7 @@ from strands.models import BedrockModel
 from src.agent.devops_agent import create_devops_agent
 from src.agent.analytics_agent import create_analytics_agent
 from src.agent.godot_review_agent import create_godot_review_agent
+from src.tools.feedback_analysis_tools import analyze_negative_feedback
 from src.utils.execution_logger import log_execution, generate_session_id
 
 # Sub-agents (lazy initialization)
@@ -128,6 +129,12 @@ SYSTEM_PROMPT = """당신은 게임 운영 총괄 AI 에이전트(Supervisor)입
 - 시그널/노드 구조 분석
 - 리플레이/테스트 시스템 리뷰
 
+### 피드백 분석 (analyze_negative_feedback)
+담당 영역:
+- 부정 피드백(👎) 조회 및 분석
+- 실패 패턴 파악
+- KB 문서 및 System Prompt 개선 제안
+
 ## 작업 위임 원칙
 
 1. **단일 영역**: 한 에이전트로 해결 가능하면 해당 에이전트에게 위임
@@ -140,6 +147,7 @@ SYSTEM_PROMPT = """당신은 게임 운영 총괄 AI 에이전트(Supervisor)입
 - "오늘 DAU 알려줘" → Analytics Agent
 - "GDScript 코드 리뷰해줘" → Godot Review Agent
 - "서버 장애가 매출에 영향을 줬는지 분석해줘" → DevOps + Analytics 순차 호출
+- "피드백 분석해서 개선점 알려줘" → analyze_negative_feedback
 
 ## 응답 원칙
 - 한국어로 응답
@@ -163,6 +171,7 @@ def create_supervisor_agent() -> Agent:
             ask_devops_agent,
             ask_analytics_agent,
             ask_godot_review_agent,
+            analyze_negative_feedback,
         ],
     )
     

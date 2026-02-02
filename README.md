@@ -330,10 +330,11 @@ chainlit run app.py
 - [x] 기존 Agent 수정 기능 (KB 연동 패턴 추가)
 - [x] 상세 보기 버튼 (Supervisor 요약 + 전체 응답 확인)
 
-### v1.3 - 자동 개선 제안 (피드백 축적 후)
-- [ ] 실패 패턴 분석
-- [ ] KB 문서 자동 제안
-- [ ] System Prompt 개선 제안
+### v1.3 - 자동 개선 제안 ✅
+- [x] 부정 피드백 분석 도구 (analyze_negative_feedback)
+- [x] 실패 패턴 분석 및 개선 제안
+- [ ] KB 문서 자동 생성 (향후)
+- [ ] System Prompt 자동 수정 (향후)
 
 ### v2.0 - 자동화 워크플로우
 - [ ] 스케줄러 (일/주간 자동 분석)
@@ -477,10 +478,11 @@ See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for AWS deployment.
 - [x] Modify existing Agent (KB integration pattern)
 - [x] Detail view button (Supervisor summary + full response)
 
-### v1.3 - Auto Improvement Suggestions (After feedback accumulation)
-- [ ] Failure pattern analysis
-- [ ] KB document suggestions
-- [ ] System Prompt improvement suggestions
+### v1.3 - Auto Improvement Suggestions ✅
+- [x] Negative feedback analysis tool (analyze_negative_feedback)
+- [x] Failure pattern analysis and improvement suggestions
+- [ ] Auto KB document generation (future)
+- [ ] Auto System Prompt modification (future)
 
 ### v2.0 - Automation Workflow
 - [ ] Scheduler (daily/weekly auto-analysis)
