@@ -1,9 +1,16 @@
 # Agent Builder Guide
 
 ## 목적
-자연어 명령으로 새 Agent를 생성하고 Supervisor에 연결
+자연어 명령으로 Agent를 생성/수정하고 Supervisor에 연결
+
+## 지원 작업
+1. **새 Agent 생성**: 도구 + Agent + Supervisor 연결
+2. **기존 Agent 수정**: 도구 추가, 시스템 프롬프트 개선, KB 연동
+3. **Knowledge Base 연동**: 참조 자료를 KB로 구축하여 Agent에 연결
 
 ## 워크플로우
+
+### A. 새 Agent 생성
 
 ```
 사용자: "HR Agent 만들어줘. 휴가 신청, 직원 조회 기능으로"
@@ -11,6 +18,29 @@
 1. 도구 파일 생성: src/tools/{name}_tools.py
 2. Agent 파일 생성: src/agent/{name}_agent.py
 3. Supervisor 수정: supervisor_agent.py
+4. 테스트 안내
+```
+
+### B. 기존 Agent 수정
+
+```
+사용자: "Godot Review Agent에 KB 검색 기능 추가해줘"
+                    ↓
+1. 현재 Agent 파일 분석: src/agent/{name}_agent.py
+2. 현재 도구 파일 분석: src/tools/{name}_tools.py
+3. 필요한 수정 계획 제시
+4. 사용자 확인 후 수정 실행
+5. 테스트 안내
+```
+
+### C. Knowledge Base 연동
+
+```
+사용자: "Godot 프로젝트를 KB로 만들어서 Agent에 연결해줘"
+                    ↓
+1. KB용 도구 생성: src/tools/{name}_kb_tools.py
+2. Agent에 KB 도구 추가
+3. 시스템 프롬프트에 KB 활용 지침 추가
 4. 테스트 안내
 ```
 
@@ -172,3 +202,163 @@ chainlit run app.py --port 8000
 - src/agent/analytics_agent.py
 - src/agent/supervisor_agent.py
 - src/tools/cloudwatch_tools.py
+- src/tools/kb_tools.py (KB 연동 패턴)
+
+---
+
+## Knowledge Base 연동 패턴
+
+### KB 도구 템플릿 (Bedrock KB 사용)
+
+```python
+"""[Name] KB Tools - Knowledge Base 검색."""
+import boto3
+from strands import tool
+
+KNOWLEDGE_BASE_ID = "[KB_ID]"  # Bedrock KB ID
+
+@tool
+def search_{name}_kb(query: str) -> str:
+    """[Name] 관련 지식을 검색합니다.
+    
+    Args:
+        query: 검색할 내용
+    
+    Returns:
+        관련 지식 검색 결과
+    """
+    client = boto3.client("bedrock-agent-runtime", region_name="us-east-1")
+    
+    response = client.retrieve(
+        knowledgeBaseId=KNOWLEDGE_BASE_ID,
+        retrievalQuery={"text": query},
+        retrievalConfiguration={
+            "vectorSearchConfiguration": {"numberOfResults": 5}
+        }
+    )
+    
+    results = []
+    for i, result in enumerate(response.get("retrievalResults", []), 1):
+        content = result.get("content", {}).get("text", "")
+        score = result.get("score", 0)
+        if score > 0.3:
+            if len(content) > 2000:
+                content = content[:2000] + "..."
+            results.append(f"[결과 {i}] (관련도: {score:.2f})\n{content}")
+    
+    return "\n\n---\n\n".join(results) if results else "관련 내용을 찾지 못했습니다."
+```
+
+### KB 도구 템플릿 (로컬 파일 기반)
+
+```python
+"""[Name] KB Tools - 로컬 파일 기반 지식 검색."""
+import os
+from strands import tool
+
+KB_ROOT = "[경로]"  # 지식 베이스 루트 디렉토리
+
+@tool
+def search_{name}_files(query: str, file_extension: str = ".gd") -> str:
+    """[Name] 프로젝트에서 관련 파일을 검색합니다.
+    
+    Args:
+        query: 검색할 키워드
+        file_extension: 파일 확장자 (기본: .gd)
+    
+    Returns:
+        검색 결과
+    """
+    results = []
+    for root, dirs, files in os.walk(KB_ROOT):
+        for file in files:
+            if file.endswith(file_extension):
+                path = os.path.join(root, file)
+                with open(path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                if query.lower() in content.lower():
+                    results.append(f"파일: {path}\n매칭된 내용 포함")
+    
+    return "\n".join(results) if results else "관련 파일을 찾지 못했습니다."
+
+@tool
+def get_{name}_file_content(file_path: str) -> str:
+    """특정 파일의 내용을 가져옵니다.
+    
+    Args:
+        file_path: 파일 경로
+    
+    Returns:
+        파일 내용
+    """
+    full_path = os.path.join(KB_ROOT, file_path) if not file_path.startswith(KB_ROOT) else file_path
+    if os.path.exists(full_path):
+        with open(full_path, 'r', encoding='utf-8') as f:
+            return f.read()
+    return f"파일을 찾을 수 없습니다: {file_path}"
+```
+
+### KB 컨텍스트 문서 작성 가이드
+
+KB에는 단순 코드뿐 아니라 **컨벤션과 맥락 정보**를 함께 포함해야 합니다.
+
+**KB 컨텍스트 문서 구조:**
+```markdown
+# [프로젝트명] 코드 리뷰 컨텍스트
+
+## Part 1: [기술/엔진] 기초
+- 기본 개념, 문법, 주요 API
+
+## Part 2: 프로젝트 개요
+- 프로젝트 목적, 특징
+
+## Part 3: 코드 컨벤션
+- 네이밍 규칙, 타입 힌트, 권장/비권장 패턴
+
+## Part 4: 프로젝트 구조
+- 디렉토리 구조, 파일별 역할
+
+## Part 5: 핵심 패턴
+- 프로젝트 특유의 패턴 (예: 리플레이 모드 분기)
+- 각 패턴의 맥락 설명
+
+## Part 6: 성능 고려사항
+- 권장/주의 사항
+
+## Part 7: 리뷰 체크리스트
+- 코드 리뷰 시 확인할 항목
+
+## Part 8: 코드 예시
+- 실제 프로젝트의 모범 코드
+```
+
+**KB 활용 원칙:**
+- KB는 리뷰 **참고용** (리뷰 대상 코드는 사용자가 제공)
+- 컨벤션 일관성 검토에 활용
+- 프로젝트 맥락 파악에 활용
+
+### Agent에 KB 연동 시 시스템 프롬프트 추가 사항
+
+```
+## Knowledge Base 활용
+
+이 Agent는 [Name] Knowledge Base에 접근할 수 있습니다.
+
+KB 활용 원칙:
+1. 질문에 답하기 전 관련 지식 먼저 검색
+2. KB 검색 결과를 바탕으로 구체적인 답변 제공
+3. KB에 없는 내용은 일반 지식으로 보완
+4. 출처(파일명/문서명) 명시
+```
+
+---
+
+## Agent 수정 체크리스트
+
+기존 Agent 수정 시 확인:
+- [ ] 현재 도구 목록 파악
+- [ ] 현재 시스템 프롬프트 분석
+- [ ] 수정 계획 사용자에게 제시
+- [ ] 사용자 확인 후 수정 진행
+- [ ] 새 도구 추가 시 import 및 tools 배열 업데이트
+- [ ] 시스템 프롬프트 수정 시 기존 내용 유지하며 추가

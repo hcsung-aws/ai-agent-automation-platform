@@ -323,11 +323,12 @@ chainlit run app.py
 - [x] 피드백 조회 API + 대시보드
 - [x] 중복 방지 + 변경 기능
 
-### v1.2 - Agent Builder Agent ⭐ (진행 중)
+### v1.2 - Agent Builder Agent ✅
 - [x] Agent Builder Kiro Agent 구현 (`~/.kiro/agents/agent-builder.json`)
 - [x] 생성 가이드 작성 (`context_rule/agent-builder-guide.md`)
-- [ ] 자연어로 Agent 생성 테스트: *"HR Agent 만들어줘"*
-- [ ] Supervisor 자동 연결 검증
+- [x] 자연어로 Agent 생성 테스트 (Godot Review Agent)
+- [x] 기존 Agent 수정 기능 (KB 연동 패턴 추가)
+- [x] 상세 보기 버튼 (Supervisor 요약 + 전체 응답 확인)
 
 ### v1.3 - 자동 개선 제안 (피드백 축적 후)
 - [ ] 실패 패턴 분석
@@ -469,11 +470,12 @@ See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for AWS deployment.
 - [x] Feedback API + dashboard
 - [x] Duplicate prevention + change feature
 
-### v1.2 - Agent Builder Agent ⭐ (In Progress)
+### v1.2 - Agent Builder Agent ✅
 - [x] Agent Builder Kiro Agent (`~/.kiro/agents/agent-builder.json`)
 - [x] Builder guide (`context_rule/agent-builder-guide.md`)
-- [ ] Test Agent creation: *"Create an HR Agent"*
-- [ ] Verify Supervisor auto-connection
+- [x] Test Agent creation (Godot Review Agent)
+- [x] Modify existing Agent (KB integration pattern)
+- [x] Detail view button (Supervisor summary + full response)
 
 ### v1.3 - Auto Improvement Suggestions (After feedback accumulation)
 - [ ] Failure pattern analysis

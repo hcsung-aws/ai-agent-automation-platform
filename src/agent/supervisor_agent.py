@@ -5,11 +5,13 @@ from strands.models import BedrockModel
 
 from src.agent.devops_agent import create_devops_agent
 from src.agent.analytics_agent import create_analytics_agent
+from src.agent.godot_review_agent import create_godot_review_agent
 from src.utils.execution_logger import log_execution, generate_session_id
 
 # Sub-agents (lazy initialization)
 _devops_agent = None
 _analytics_agent = None
+_godot_review_agent = None
 _current_tools_used = []
 _current_sub_agents = []
 
@@ -26,6 +28,13 @@ def _get_analytics_agent():
     if _analytics_agent is None:
         _analytics_agent = create_analytics_agent()
     return _analytics_agent
+
+
+def _get_godot_review_agent():
+    global _godot_review_agent
+    if _godot_review_agent is None:
+        _godot_review_agent = create_godot_review_agent()
+    return _godot_review_agent
 
 
 @tool
@@ -68,6 +77,26 @@ def ask_analytics_agent(query: str) -> str:
     return str(response)
 
 
+@tool
+def ask_godot_review_agent(query: str) -> str:
+    """Godot/GDScript 전문가 에이전트에게 질문합니다.
+    
+    GDScript 코드 리뷰, 베스트 프랙티스 검증, 성능 최적화,
+    시그널/노드 구조 분석, 리플레이 시스템 구현 등을 수행합니다.
+    
+    Args:
+        query: Godot/GDScript 관련 질문 또는 요청
+    
+    Returns:
+        Godot Review Agent의 응답
+    """
+    global _current_sub_agents
+    _current_sub_agents.append("godot_review")
+    agent = _get_godot_review_agent()
+    response = agent(query)
+    return str(response)
+
+
 SYSTEM_PROMPT = """당신은 게임 운영 총괄 AI 에이전트(Supervisor)입니다.
 
 ## 역할
@@ -91,6 +120,14 @@ SYSTEM_PROMPT = """당신은 게임 운영 총괄 AI 에이전트(Supervisor)입
 - 퀘스트/업적 완료율
 - 레벨 분포, 출석 현황
 
+### Godot Review Agent (ask_godot_review_agent)
+담당 영역:
+- GDScript 코드 품질 검토
+- Godot 베스트 프랙티스 검증
+- 성능 이슈 탐지 및 최적화
+- 시그널/노드 구조 분석
+- 리플레이/테스트 시스템 리뷰
+
 ## 작업 위임 원칙
 
 1. **단일 영역**: 한 에이전트로 해결 가능하면 해당 에이전트에게 위임
@@ -101,6 +138,7 @@ SYSTEM_PROMPT = """당신은 게임 운영 총괄 AI 에이전트(Supervisor)입
 
 - "서버 상태 확인해줘" → DevOps Agent
 - "오늘 DAU 알려줘" → Analytics Agent
+- "GDScript 코드 리뷰해줘" → Godot Review Agent
 - "서버 장애가 매출에 영향을 줬는지 분석해줘" → DevOps + Analytics 순차 호출
 
 ## 응답 원칙
@@ -124,6 +162,7 @@ def create_supervisor_agent() -> Agent:
         tools=[
             ask_devops_agent,
             ask_analytics_agent,
+            ask_godot_review_agent,
         ],
     )
     
@@ -160,7 +199,7 @@ class LoggingSupervisorAgent:
             agent_type="supervisor",
             user_input=user_input,
             agent_response=response_text,
-            tools_used=["ask_devops_agent", "ask_analytics_agent"] if _current_sub_agents else [],
+            tools_used=["ask_devops_agent", "ask_analytics_agent", "ask_godot_review_agent"] if _current_sub_agents else [],
             sub_agents=list(set(_current_sub_agents)),
             execution_time_ms=execution_time_ms,
             status=status,
@@ -174,7 +213,7 @@ if __name__ == "__main__":
     agent = create_supervisor_agent()
     
     print("Supervisor Agent 시작. 'quit'으로 종료.")
-    print("DevOps + Analytics Agent를 조율합니다.")
+    print("DevOps + Analytics + Godot Review Agent를 조율합니다.")
     print("-" * 50)
     
     while True:
