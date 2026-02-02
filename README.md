@@ -56,6 +56,11 @@ kiro chat --agent agent-builder
 "CloudWatch 알람을 조회하는 Monitoring Agent 만들어줘"
 ```
 
+Agent Builder가 단계별로 안내합니다:
+- 처음 1-2개 핵심 기능으로 시작 권장
+- 테스트 데이터로 먼저 동작 확인
+- 테스트 후 실제 API 연동
+
 상세 가이드: [docs/QUICKSTART.md](docs/QUICKSTART.md)
 
 ---
