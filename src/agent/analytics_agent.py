@@ -4,7 +4,7 @@ from strands.models import BedrockModel
 
 from src.tools.athena_tools import run_athena_query, list_athena_tables, get_table_schema
 from src.tools.quicksight_tools import list_quicksight_dashboards, list_quicksight_datasets, get_dataset_refresh_status
-from src.tools.kb_tools import search_operations_guide
+from src.tools.kb_tools import search_analytics_knowledge
 from src.tools.mmorpg_analytics import (
     analyze_gacha_rates,
     analyze_currency_flow,
@@ -89,7 +89,7 @@ def create_analytics_agent() -> Agent:
             list_quicksight_datasets,
             get_dataset_refresh_status,
             # KB 도구
-            search_operations_guide,
+            search_analytics_knowledge,
         ],
     )
     

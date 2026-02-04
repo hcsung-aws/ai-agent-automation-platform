@@ -67,7 +67,7 @@ TEST_ALARM_HISTORY = [
 ]
 
 
-TEST_DATA_NOTICE = "⚠️ [테스트 데이터] 실제 AWS CloudWatch API 연동 전 샘플입니다.\n\n"
+TEST_DATA_NOTICE = ""  # 테스트 모드 표시는 app.py에서 처리
 
 
 @tool

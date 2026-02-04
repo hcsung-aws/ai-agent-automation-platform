@@ -8,6 +8,7 @@ from src.agent.analytics_agent import create_analytics_agent
 from src.agent.godot_review_agent import create_godot_review_agent
 from src.agent.monitoring_agent import create_monitoring_agent
 from src.tools.feedback_analysis_tools import analyze_negative_feedback
+from src.tools.kb_tools import search_common_knowledge
 from src.utils.execution_logger import log_execution, generate_session_id
 
 # Sub-agents (lazy initialization)
@@ -210,6 +211,7 @@ def create_supervisor_agent() -> Agent:
             ask_godot_review_agent,
             ask_monitoring_agent,
             analyze_negative_feedback,
+            search_common_knowledge,
         ],
     )
     

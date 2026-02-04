@@ -24,6 +24,9 @@ def create_visualized_supervisor(on_step: Callable):
     godot_review_agent = None
     monitoring_agent = None
     
+    # 테스트 모드 플래그 저장
+    test_mode_agents = set()
+    
     @tool
     def ask_devops_agent(query: str) -> str:
         """DevOps 전문가 에이전트에게 질문합니다."""
@@ -32,7 +35,7 @@ def create_visualized_supervisor(on_step: Callable):
         if devops_agent is None:
             devops_agent = create_devops_agent()
         response = str(devops_agent(query))
-        on_step("devops", "end", response)
+        on_step("devops", "end", response, False)
         return response
 
     @tool
@@ -43,7 +46,7 @@ def create_visualized_supervisor(on_step: Callable):
         if analytics_agent is None:
             analytics_agent = create_analytics_agent()
         response = str(analytics_agent(query))
-        on_step("analytics", "end", response)
+        on_step("analytics", "end", response, False)
         return response
 
     @tool
@@ -54,7 +57,7 @@ def create_visualized_supervisor(on_step: Callable):
         if godot_review_agent is None:
             godot_review_agent = create_godot_review_agent()
         response = str(godot_review_agent(query))
-        on_step("godot_review", "end", response)
+        on_step("godot_review", "end", response, False)
         return response
 
     @tool
@@ -63,9 +66,11 @@ def create_visualized_supervisor(on_step: Callable):
         nonlocal monitoring_agent
         on_step("monitoring", "start", query)
         if monitoring_agent is None:
-            monitoring_agent = create_monitoring_agent()
+            monitoring_agent, is_test = create_monitoring_agent()
+            if is_test:
+                test_mode_agents.add("monitoring")
         response = str(monitoring_agent(query))
-        on_step("monitoring", "end", response)
+        on_step("monitoring", "end", response, "monitoring" in test_mode_agents)
         return response
 
     SYSTEM_PROMPT = """당신은 게임 운영 총괄 AI 에이전트(Supervisor)입니다.
@@ -119,6 +124,7 @@ def create_visualized_supervisor(on_step: Callable):
 - 한국어로 응답
 - **에이전트 응답을 반드시 텍스트로 출력할 것**
 - 에이전트가 반환한 전체 내용을 그대로 복사하여 응답에 포함
+- **⚠️ 경고/주의 문구(테스트 데이터 등)는 절대 생략하지 말 것**
 - 요약하거나 생략하지 말 것
 - 도구 호출 후 반드시 결과를 사용자에게 보여줄 것
 """
@@ -166,14 +172,17 @@ async def main(message: cl.Message):
     steps_log = []
     full_agent_responses = {}  # 에이전트별 전체 응답 저장
     
-    def on_step(agent_name: str, phase: str, content: str):
+    def on_step(agent_name: str, phase: str, content: str, is_test_mode: bool = False):
         steps_log.append({
             "agent": agent_name,
             "phase": phase,
             "content": content[:200] + "..." if len(content) > 200 else content,
         })
         if phase == "end":
-            full_agent_responses[agent_name] = content  # 전체 응답 저장
+            full_agent_responses[agent_name] = {
+                "content": content,
+                "is_test_mode": is_test_mode
+            }
     
     status_msg = cl.Message(content="🔄 **Supervisor Agent** 분석 중...")
     await status_msg.send()
@@ -227,6 +236,14 @@ async def main(message: cl.Message):
     })
     cl.user_session.set(f"detail_{message_id}", full_agent_responses)
     
+    # Check if any agent is in test mode and show warning banner
+    test_mode_agents = [name for name, data in full_agent_responses.items() if data.get("is_test_mode")]
+    if test_mode_agents:
+        agent_names = ", ".join(test_mode_agents)
+        await cl.Message(
+            content=f"⚠️ **테스트 모드**: {agent_names} Agent가 샘플 데이터를 사용 중입니다. 실제 데이터가 아닐 수 있습니다."
+        ).send()
+    
     # Build actions - feedback + detail view buttons
     actions = [
         cl.Action(name="feedback_positive", payload={"message_id": message_id}, label="👍 좋아요"),
@@ -234,7 +251,7 @@ async def main(message: cl.Message):
     ]
     
     # Add detail view button for each agent that responded
-    for agent_name in full_agent_responses.keys():
+    for agent_name, data in full_agent_responses.items():
         if agent_name == "devops":
             label = "🔧 DevOps 상세"
         elif agent_name == "analytics":
@@ -291,7 +308,15 @@ async def on_show_detail(action: cl.Action):
     agent_name = action.payload.get("agent")
     
     full_responses = cl.user_session.get(f"detail_{message_id}", {})
-    detail_content = full_responses.get(agent_name, "상세 내용을 찾을 수 없습니다.")
+    agent_data = full_responses.get(agent_name, {})
+    
+    # Handle both old format (string) and new format (dict)
+    if isinstance(agent_data, dict):
+        detail_content = agent_data.get("content", "상세 내용을 찾을 수 없습니다.")
+        is_test_mode = agent_data.get("is_test_mode", False)
+    else:
+        detail_content = agent_data if agent_data else "상세 내용을 찾을 수 없습니다."
+        is_test_mode = False
     
     if agent_name == "devops":
         title = "🔧 DevOps Agent 상세 응답"
@@ -302,7 +327,12 @@ async def on_show_detail(action: cl.Action):
     else:
         title = "🎮 Godot Review Agent 상세 응답"
     
-    await cl.Message(content=f"## {title}\n\n{detail_content}").send()
+    # Add test mode warning if applicable
+    test_warning = ""
+    if is_test_mode:
+        test_warning = "⚠️ **테스트 모드**: 샘플 데이터 기반 응답입니다.\n\n"
+    
+    await cl.Message(content=f"## {title}\n\n{test_warning}{detail_content}").send()
 
 
 @cl.action_callback("feedback_positive")
