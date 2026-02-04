@@ -9,6 +9,7 @@ from strands.models import BedrockModel
 from src.agent.devops_agent import create_devops_agent
 from src.agent.analytics_agent import create_analytics_agent
 from src.agent.godot_review_agent import create_godot_review_agent
+from src.agent.monitoring_agent import create_monitoring_agent
 from src.utils.execution_logger import (
     log_execution, generate_session_id, 
     log_feedback, generate_message_id
@@ -21,6 +22,7 @@ def create_visualized_supervisor(on_step: Callable):
     devops_agent = None
     analytics_agent = None
     godot_review_agent = None
+    monitoring_agent = None
     
     @tool
     def ask_devops_agent(query: str) -> str:
@@ -55,6 +57,17 @@ def create_visualized_supervisor(on_step: Callable):
         on_step("godot_review", "end", response)
         return response
 
+    @tool
+    def ask_monitoring_agent(query: str) -> str:
+        """CloudWatch 알람 모니터링 전문가 에이전트에게 질문합니다."""
+        nonlocal monitoring_agent
+        on_step("monitoring", "start", query)
+        if monitoring_agent is None:
+            monitoring_agent = create_monitoring_agent()
+        response = str(monitoring_agent(query))
+        on_step("monitoring", "end", response)
+        return response
+
     SYSTEM_PROMPT = """당신은 게임 운영 총괄 AI 에이전트(Supervisor)입니다.
 사용자의 요청을 분석하여 **가장 적합한 하나의 전문가 에이전트**에게 작업을 위임합니다.
 
@@ -65,7 +78,7 @@ def create_visualized_supervisor(on_step: Callable):
 - EC2 인스턴스 상태 확인
 - 장애 티켓 생성/조회
 - CloudFormation 배포 이력
-- 키워드: 서버, 인프라, EC2, 장애, 배포, 모니터링
+- 키워드: 서버, 인프라, EC2, 장애, 배포
 
 ### Analytics Agent (ask_analytics_agent)
 - DAU/MAU, 리텐션 분석
@@ -80,6 +93,12 @@ def create_visualized_supervisor(on_step: Callable):
 - 성능 이슈 분석
 - 키워드: 코드, 리뷰, GDScript, Godot, 스크립트
 
+### Monitoring Agent (ask_monitoring_agent)
+- CloudWatch 알람 현황 조회
+- 알람 히스토리 및 추이 분석
+- 알람 기반 이슈 진단 및 리포팅
+- 키워드: 알람, 알림, 모니터링, 경보, 이슈 분석
+
 ## 위임 규칙
 
 1. **단일 에이전트 원칙**: 요청당 하나의 에이전트만 호출
@@ -93,6 +112,8 @@ def create_visualized_supervisor(on_step: Callable):
 - "구체적인 코드 제안해줘" (이전이 코드 리뷰) → Godot Review Agent만 호출
 - "서버 상태 확인해줘" → DevOps Agent만 호출
 - "DAU 분석해줘" → Analytics Agent만 호출
+- "알람 현황 보여줘" → Monitoring Agent만 호출
+- "알람 분석해서 이슈 리포팅해줘" → Monitoring Agent만 호출
 
 ## 응답 원칙
 - 한국어로 응답
@@ -110,7 +131,7 @@ def create_visualized_supervisor(on_step: Callable):
     return Agent(
         model=model,
         system_prompt=SYSTEM_PROMPT,
-        tools=[ask_devops_agent, ask_analytics_agent, ask_godot_review_agent],
+        tools=[ask_devops_agent, ask_analytics_agent, ask_godot_review_agent, ask_monitoring_agent],
     )
 
 
@@ -127,7 +148,8 @@ async def start():
         f"(세션 ID: {session_id})\n\n"
         "**DevOps 영역:** 인프라 모니터링, 장애 티켓, 배포 이력\n"
         "**Analytics 영역:** DAU/MAU, 가챠 확률, 재화 흐름\n"
-        "**Godot Review 영역:** GDScript 코드 리뷰, 성능 분석\n\n"
+        "**Godot Review 영역:** GDScript 코드 리뷰, 성능 분석\n"
+        "**Monitoring 영역:** CloudWatch 알람 현황, 추이 분석, 이슈 리포팅\n\n"
         "질문하시면 처리 과정을 단계별로 보여드립니다."
     ).send()
 
@@ -181,6 +203,8 @@ async def main(message: cl.Message):
             agent_emoji, agent_label = "🔧", "DevOps Agent"
         elif step["agent"] == "analytics":
             agent_emoji, agent_label = "📊", "Analytics Agent"
+        elif step["agent"] == "monitoring":
+            agent_emoji, agent_label = "🔔", "Monitoring Agent"
         else:
             agent_emoji, agent_label = "🎮", "Godot Review Agent"
         
@@ -215,6 +239,8 @@ async def main(message: cl.Message):
             label = "🔧 DevOps 상세"
         elif agent_name == "analytics":
             label = "📊 Analytics 상세"
+        elif agent_name == "monitoring":
+            label = "🔔 Monitoring 상세"
         else:
             label = "🎮 Godot Review 상세"
         actions.append(
@@ -271,6 +297,8 @@ async def on_show_detail(action: cl.Action):
         title = "🔧 DevOps Agent 상세 응답"
     elif agent_name == "analytics":
         title = "📊 Analytics Agent 상세 응답"
+    elif agent_name == "monitoring":
+        title = "🔔 Monitoring Agent 상세 응답"
     else:
         title = "🎮 Godot Review Agent 상세 응답"
     

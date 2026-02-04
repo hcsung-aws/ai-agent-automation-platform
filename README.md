@@ -160,6 +160,7 @@ ai-agent-platform/
 | DevOps | 6개 | CloudWatch, EC2, 장애 티켓 |
 | Analytics | 10개 | DAU, 가챠 확률, 재화 흐름 |
 | Godot Review | 5개 | GDScript 코드 리뷰 |
+| Monitoring | 3개 | CloudWatch 알람 현황, 추이 분석, 이슈 리포팅 |
 
 ```bash
 # 테스트
@@ -168,6 +169,8 @@ chainlit run app.py
 # 질문 예시
 "장애 티켓 목록 보여줘"
 "가챠 등급별 확률 분석해줘"
+"알람 현황 확인해줘"
+"알람 분석해서 이슈 리포팅해줘"
 ```
 
 ---

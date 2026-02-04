@@ -6,6 +6,7 @@ from strands.models import BedrockModel
 from src.agent.devops_agent import create_devops_agent
 from src.agent.analytics_agent import create_analytics_agent
 from src.agent.godot_review_agent import create_godot_review_agent
+from src.agent.monitoring_agent import create_monitoring_agent
 from src.tools.feedback_analysis_tools import analyze_negative_feedback
 from src.utils.execution_logger import log_execution, generate_session_id
 
@@ -13,6 +14,7 @@ from src.utils.execution_logger import log_execution, generate_session_id
 _devops_agent = None
 _analytics_agent = None
 _godot_review_agent = None
+_monitoring_agent = None
 _current_tools_used = []
 _current_sub_agents = []
 
@@ -36,6 +38,13 @@ def _get_godot_review_agent():
     if _godot_review_agent is None:
         _godot_review_agent = create_godot_review_agent()
     return _godot_review_agent
+
+
+def _get_monitoring_agent():
+    global _monitoring_agent
+    if _monitoring_agent is None:
+        _monitoring_agent = create_monitoring_agent()
+    return _monitoring_agent
 
 
 @tool
@@ -98,6 +107,26 @@ def ask_godot_review_agent(query: str) -> str:
     return str(response)
 
 
+@tool
+def ask_monitoring_agent(query: str) -> str:
+    """CloudWatch 알람 모니터링 전문가 에이전트에게 질문합니다.
+    
+    CloudWatch 알람 현황 조회, 알람 히스토리 분석, 이슈 진단,
+    알람 기반 장애 예측 및 대응 방안 제시 등을 수행합니다.
+    
+    Args:
+        query: CloudWatch 알람 모니터링 관련 질문 또는 요청
+    
+    Returns:
+        Monitoring Agent의 응답
+    """
+    global _current_sub_agents
+    _current_sub_agents.append("monitoring")
+    agent = _get_monitoring_agent()
+    response = agent(query)
+    return str(response)
+
+
 SYSTEM_PROMPT = """당신은 게임 운영 총괄 AI 에이전트(Supervisor)입니다.
 
 ## 역할
@@ -129,6 +158,13 @@ SYSTEM_PROMPT = """당신은 게임 운영 총괄 AI 에이전트(Supervisor)입
 - 시그널/노드 구조 분석
 - 리플레이/테스트 시스템 리뷰
 
+### Monitoring Agent (ask_monitoring_agent)
+담당 영역:
+- CloudWatch 알람 현황 조회
+- 알람 히스토리 분석
+- 알람 기반 이슈 진단
+- 장애 예측 및 대응 방안 제시
+
 ### 피드백 분석 (analyze_negative_feedback)
 담당 영역:
 - 부정 피드백(👎) 조회 및 분석
@@ -146,6 +182,7 @@ SYSTEM_PROMPT = """당신은 게임 운영 총괄 AI 에이전트(Supervisor)입
 - "서버 상태 확인해줘" → DevOps Agent
 - "오늘 DAU 알려줘" → Analytics Agent
 - "GDScript 코드 리뷰해줘" → Godot Review Agent
+- "알람 현황 확인해줘" → Monitoring Agent
 - "서버 장애가 매출에 영향을 줬는지 분석해줘" → DevOps + Analytics 순차 호출
 - "피드백 분석해서 개선점 알려줘" → analyze_negative_feedback
 
@@ -171,6 +208,7 @@ def create_supervisor_agent() -> Agent:
             ask_devops_agent,
             ask_analytics_agent,
             ask_godot_review_agent,
+            ask_monitoring_agent,
             analyze_negative_feedback,
         ],
     )
@@ -208,7 +246,7 @@ class LoggingSupervisorAgent:
             agent_type="supervisor",
             user_input=user_input,
             agent_response=response_text,
-            tools_used=["ask_devops_agent", "ask_analytics_agent", "ask_godot_review_agent"] if _current_sub_agents else [],
+            tools_used=["ask_devops_agent", "ask_analytics_agent", "ask_godot_review_agent", "ask_monitoring_agent"] if _current_sub_agents else [],
             sub_agents=list(set(_current_sub_agents)),
             execution_time_ms=execution_time_ms,
             status=status,
@@ -222,7 +260,7 @@ if __name__ == "__main__":
     agent = create_supervisor_agent()
     
     print("Supervisor Agent 시작. 'quit'으로 종료.")
-    print("DevOps + Analytics + Godot Review Agent를 조율합니다.")
+    print("DevOps + Analytics + Godot Review + Monitoring Agent를 조율합니다.")
     print("-" * 50)
     
     while True:
