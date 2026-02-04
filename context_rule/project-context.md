@@ -68,6 +68,28 @@
 - 상세 보기 버튼 label 추가
 - 상세 보기 title 추가
 
+### Mickey 10: KB 문서 추가 절차
+- S3 업로드 → 메타데이터 파일 생성 → KB Sync 3단계 필수
+- 메타데이터 파일: `{filename}.metadata.json` 형식
+- category 태그: common, devops, analytics, monitoring
+```bash
+# 1. 문서 업로드
+aws s3 cp doc.md s3://devops-agent-kb-965037532757/knowledge-base/[category]/
+
+# 2. 메타데이터 생성
+echo '{"metadataAttributes":{"category":"[category]"}}' | \
+  aws s3 cp - s3://devops-agent-kb-965037532757/knowledge-base/[category]/doc.md.metadata.json
+
+# 3. KB Sync
+aws bedrock-agent start-ingestion-job --knowledge-base-id H50SNRJBFF --data-source-id OSFG10XDDN --region us-east-1
+```
+
+### Mickey 10: S3 경로 변경 시 IAM 정책 확인
+- Problem: KB Sync 실패 (403 Access Denied)
+- Cause: IAM 정책이 기존 경로만 허용
+- Solution: 새 경로를 IAM 정책 Resource에 추가
+- 관련 정책: `AmazonBedrockS3PolicyForKnowledgeBase_p2y8n`
+
 ## File Locations
 - Source: src/ (예정)
 - Infrastructure: infra/ (예정)
@@ -80,4 +102,4 @@
 ```
 
 ## Last Updated
-Mickey 9 - 2026-02-04
+Mickey 10 - 2026-02-04
