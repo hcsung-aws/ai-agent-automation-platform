@@ -1,80 +1,101 @@
-# AI Agent 기반 업무 자동화 플랫폼
+# AIOps 스타터 킷
 
 [English](#english-version) | 한국어
 
-## 이 프로젝트는 무엇인가요?
+## 🎯 프로젝트 비전
 
-**자연어로 AI Agent를 만들고 점진적으로 개선하는 플랫폼**입니다.
+**자연어로 AI Agent를 만들고, 로컬에서 테스트하고, AWS에 배포하여 AIOps를 시작하세요.**
 
-핵심 특징:
-- **코드 없이 Agent 생성**: Agent Builder에게 자연어로 요청
-- **점진적 개선**: 피드백 기반으로 Agent 자동 개선
-- **Multi-Agent 협업**: 여러 전문 Agent가 협업
+이 프로젝트는 조직이 AI Agent 기반 운영 자동화를 **쉽고 빠르게 도입**할 수 있도록 돕는 스타터 킷입니다.
 
 ```
-사용자: "HR Agent 만들어줘. 휴가 조회 기능으로"
-    ↓
-Agent Builder가 자동으로 코드 생성
-    ↓
-테스트 → 피드백 → 개선 요청
-    ↓
-점점 똑똑해지는 Agent
+┌─────────────────────────────────────────────────────────────┐
+│  "CloudWatch 알람 조회하는 Agent 만들어줘"                  │
+│                         ↓                                   │
+│  Agent Builder가 자동으로 코드 생성                         │
+│                         ↓                                   │
+│  로컬에서 테스트 → 피드백 → 개선                           │
+│                         ↓                                   │
+│  AWS AgentCore에 배포 → 프로덕션 운영                      │
+└─────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 빠른 시작
+## 🚀 빠른 시작
 
-### 1. 환경 설정 (10분)
-
-```bash
-git clone https://github.com/hcsung-aws/ai-agent-automation-platform.git
-cd ai-agent-automation-platform
-
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-```
-
-### 2. 샘플 Agent 실행 (5분)
+### 로컬 환경 (5분)
 
 ```bash
+cd templates/local
+./setup.sh
 chainlit run app.py --port 8000
 ```
 
-브라우저에서 `http://localhost:8000` 접속
+→ [상세 가이드: QUICKSTART-LOCAL.md](docs/QUICKSTART-LOCAL.md)
 
-### 3. 나만의 Agent 만들기 (15분)
+### AWS 배포 (30분)
 
-Agent Builder 실행:
+```bash
+cd templates/aws
+./deploy.sh
+```
+
+→ [상세 가이드: QUICKSTART-AWS.md](docs/QUICKSTART-AWS.md)
+
+### Agent Builder로 새 Agent 만들기
+
 ```bash
 kiro chat --agent agent-builder
 ```
 
-자연어로 요청:
 ```
-"CloudWatch 알람을 조회하는 Monitoring Agent 만들어줘"
+"HR Agent 만들어줘. 휴가 조회 기능으로"
 ```
-
-Agent Builder가 단계별로 안내합니다:
-- 처음 1-2개 핵심 기능으로 시작 권장
-- 테스트 데이터로 먼저 동작 확인
-- 테스트 후 실제 API 연동
-
-상세 가이드: [docs/QUICKSTART.md](docs/QUICKSTART.md)
 
 ---
 
-## 문서 구조
+## 📁 프로젝트 구조
+
+```
+aiops-starter-kit/
+├── templates/
+│   ├── local/                    # 로컬 배포 템플릿
+│   │   ├── setup.sh             # 원클릭 설치
+│   │   ├── app.py               # Chainlit UI
+│   │   ├── agent-builder.json   # Kiro CLI 연동
+│   │   └── agents/
+│   │       ├── supervisor.py    # Multi-Agent 조율
+│   │       └── guide_agent.py   # 프로젝트 가이드 챗봇
+│   │
+│   └── aws/                      # AWS 배포 템플릿
+│       ├── deploy.sh            # 배포 스크립트
+│       └── cdk/
+│           └── stacks/
+│               ├── infrastructure_stack.py  # ECR, IAM, KMS
+│               └── agentcore_stack.py       # Runtime, Gateway, Memory
+│
+├── src/                          # PoC 구현 (참고용)
+│   ├── agent/                   # Agent 구현 예시
+│   └── tools/                   # 도구 구현 예시
+│
+└── docs/                         # 문서
+    ├── QUICKSTART-LOCAL.md      # 로컬 배포 가이드
+    └── QUICKSTART-AWS.md        # AWS 배포 가이드
+```
+
+---
+
+## 📚 문서
 
 | 문서 | 설명 | 소요 시간 |
 |------|------|----------|
-| [QUICKSTART.md](docs/QUICKSTART.md) | 빠른 시작 가이드 | 30분 |
+| [QUICKSTART-LOCAL.md](docs/QUICKSTART-LOCAL.md) | 로컬 환경 빠른 시작 | 5분 |
+| [QUICKSTART-AWS.md](docs/QUICKSTART-AWS.md) | AWS AgentCore 배포 | 30분 |
 | [TUTORIAL-FIRST-AGENT.md](docs/TUTORIAL-FIRST-AGENT.md) | 자연어로 첫 Agent 만들기 | 30분 |
 | [TUTORIAL-FEEDBACK.md](docs/TUTORIAL-FEEDBACK.md) | 피드백 루프 설정 | 20분 |
 | [TUTORIAL-MULTI-AGENT.md](docs/TUTORIAL-MULTI-AGENT.md) | Multi-Agent 구성 | 30분 |
 | [BEST-PRACTICES.md](docs/BEST-PRACTICES.md) | 실패 사례와 교훈 | 15분 |
-| [DEPLOYMENT.md](docs/DEPLOYMENT.md) | AWS 배포 가이드 | 1시간 |
 
 ---
 

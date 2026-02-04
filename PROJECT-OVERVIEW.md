@@ -1,41 +1,54 @@
 # Project Overview
 
 ## Project Name
-AI Developer Mickey Agents - AgentCore 기반 Multi-Agent 협업 시스템
+AIOps 스타터 킷 - AI Agent 기반 운영 자동화 플랫폼
+
+## 🎯 궁극적 목표
+
+**조직이 AI Agent 기반 운영 자동화(AIOps)를 쉽고 빠르게 도입할 수 있도록 돕는 것**
+
+이 프로젝트는:
+1. **로컬 환경**에서 5분 만에 Agent 시스템을 실행하고
+2. **Agent Builder**로 자연어로 새 Agent를 만들고
+3. **AWS AgentCore**에 30분 만에 프로덕션 배포할 수 있는
+
+**완전한 스타터 킷**을 제공합니다.
 
 ## Goal
-조직의 업무 프로세스를 AI Agent 기반으로 전환하는 플랫폼 구축
 - 개별 Agent: 챗봇 + A2A 협업
 - 점진적 학습: 지식 누적 + 행동 패턴 기반 지침 생성
 - 자기 개선: 실행 기록 → 사람 검토 → 개선
+- **쉬운 배포**: 로컬/AWS 원클릭 배포 템플릿
 
 ## Scope
 - In scope:
-  - DevOps Agent, 데이터분석 Agent 구현
+  - 로컬 배포 템플릿 (setup.sh, Chainlit UI)
+  - AWS 배포 템플릿 (CDK, AgentCore)
+  - Agent Builder (Kiro CLI 연동)
   - Multi-Agent 협업 (Supervisor)
   - 실행 기록 저장 및 검토 UI
   - 지식 베이스 연동 (RAG)
-- Out of scope (PoC):
-  - 행동 패턴 자동 분석 (Phase 2)
-  - 도구 자동 업데이트 제안 (Phase 2)
-  - 프로덕션 보안 강화 (Phase 4)
+- Out of scope (향후):
+  - 행동 패턴 자동 분석
+  - 도구 자동 업데이트 제안
 
 ## Constraints
-- Technical: AWS Bedrock 기반, us-east-1 리전
-- Time: 2주 PoC
-- Resources: 제한 없음 (PoC 예산)
+- Technical: AWS Bedrock 기반, AgentCore 활용
+- Time: 로컬 5분, AWS 30분 배포 목표
+- Resources: 최소 비용으로 시작 가능
 
 ## Success Criteria
-- [x] DevOps Agent 동작 (도구 6개)
-- [x] 데이터분석 Agent 동작 (도구 10개)
-- [x] Multi-Agent 협업 시나리오 동작
-- [x] 실행 기록 저장 및 조회 가능
-- [x] 챗봇 UI로 Agent와 대화 가능
+- [x] 로컬 원클릭 설치 (setup.sh)
+- [x] AWS CDK 배포 템플릿
+- [x] Agent Builder (Kiro CLI) 연동
+- [x] 프로젝트 가이드 챗봇 (guide_agent)
+- [x] Multi-Agent Supervisor 템플릿
+- [x] QUICKSTART 문서 (로컬/AWS)
 
 ## Current Status
-- Session: Mickey 7
-- Progress: v1.2 Agent Builder 완료
-- Next: v1.3 자동 개선 제안
+- Session: Mickey 12
+- Progress: v1.3 완료, 스타터 킷 패키징 진행 중
+- Next: 문서 완성, 테스트
 
 ## Last Updated
-Mickey 7 - 2026-02-01
+Mickey 12 - 2026-02-05

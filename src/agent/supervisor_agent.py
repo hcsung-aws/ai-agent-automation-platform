@@ -8,7 +8,7 @@ from src.agent.analytics_agent import create_analytics_agent
 from src.agent.godot_review_agent import create_godot_review_agent
 from src.agent.monitoring_agent import create_monitoring_agent
 from src.tools.feedback_analysis_tools import analyze_negative_feedback
-from src.tools.kb_tools import search_common_knowledge
+from src.tools.kb_tools import search_common_knowledge, add_kb_document, trigger_kb_sync
 from src.utils.execution_logger import log_execution, generate_session_id
 
 # Sub-agents (lazy initialization)
@@ -172,6 +172,12 @@ SYSTEM_PROMPT = """당신은 게임 운영 총괄 AI 에이전트(Supervisor)입
 - 실패 패턴 파악
 - KB 문서 및 System Prompt 개선 제안
 
+### KB 관리 (add_kb_document, trigger_kb_sync)
+담당 영역:
+- KB에 새 문서 추가 (add_kb_document)
+- KB 동기화 실행 (trigger_kb_sync)
+- 피드백 분석 결과를 KB 문서로 저장
+
 ## 작업 위임 원칙
 
 1. **단일 영역**: 한 에이전트로 해결 가능하면 해당 에이전트에게 위임
@@ -186,9 +192,11 @@ SYSTEM_PROMPT = """당신은 게임 운영 총괄 AI 에이전트(Supervisor)입
 - "알람 현황 확인해줘" → Monitoring Agent
 - "서버 장애가 매출에 영향을 줬는지 분석해줘" → DevOps + Analytics 순차 호출
 - "피드백 분석해서 개선점 알려줘" → analyze_negative_feedback
+- "피드백 분석해서 KB에 저장해줘" → analyze_negative_feedback → add_kb_document → trigger_kb_sync
 
 ## 응답 원칙
 - 한국어로 응답
+- 조직/정책/에스컬레이션 관련 질문 → search_common_knowledge() 먼저 호출
 - 어떤 에이전트에게 위임했는지 명시
 - 결과를 종합하여 명확한 인사이트 제공
 - 추가 분석이 필요하면 제안
@@ -212,6 +220,8 @@ def create_supervisor_agent() -> Agent:
             ask_monitoring_agent,
             analyze_negative_feedback,
             search_common_knowledge,
+            add_kb_document,
+            trigger_kb_sync,
         ],
     )
     
