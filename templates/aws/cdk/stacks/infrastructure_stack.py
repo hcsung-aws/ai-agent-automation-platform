@@ -18,13 +18,16 @@ from constructs import Construct
 class InfrastructureStack(Stack):
     """AgentCore 기반 인프라 스택."""
     
-    def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
+    def __init__(self, scope: Construct, construct_id: str, stack_prefix: str = "AIOps", **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
+        
+        # 리소스명 접두사 (소문자)
+        prefix = stack_prefix.lower()
         
         # === KMS 키 (암호화) ===
         self.kms_key = kms.Key(
             self, "AgentCoreKey",
-            description="AIOps Agent 암호화 키",
+            description=f"{stack_prefix} Agent 암호화 키",
             enable_key_rotation=True,
             removal_policy=RemovalPolicy.RETAIN,
         )
@@ -32,7 +35,7 @@ class InfrastructureStack(Stack):
         # === ECR 리포지토리 (Agent 컨테이너) ===
         self.ecr_repo = ecr.Repository(
             self, "AgentRepository",
-            repository_name="aiops-agents",
+            repository_name=f"{prefix}-agents",
             encryption=ecr.RepositoryEncryption.KMS,
             encryption_key=self.kms_key,
             removal_policy=RemovalPolicy.DESTROY,
@@ -45,7 +48,7 @@ class InfrastructureStack(Stack):
         # 나중에 Bedrock KB 데이터 소스로 연결 가능
         self.kb_bucket = s3.Bucket(
             self, "KnowledgeBaseBucket",
-            bucket_name=f"aiops-kb-{self.account}-{self.region}",
+            bucket_name=f"{prefix}-kb-{self.account}-{self.region}",
             encryption=s3.BucketEncryption.S3_MANAGED,
             enforce_ssl=True,
             block_public_access=s3.BlockPublicAccess.BLOCK_ALL,
@@ -57,7 +60,7 @@ class InfrastructureStack(Stack):
         # === CloudWatch 로그 그룹 ===
         self.log_group = logs.LogGroup(
             self, "AgentLogs",
-            log_group_name="/aiops/agents",
+            log_group_name=f"/{prefix}/agents",
             retention=logs.RetentionDays.ONE_MONTH,
             encryption_key=self.kms_key,
             removal_policy=RemovalPolicy.DESTROY,

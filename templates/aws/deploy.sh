@@ -50,15 +50,18 @@ echo "✅ Bootstrap 완료"
 echo ""
 echo "5️⃣ 스택 배포..."
 echo ""
+STACK_PREFIX=${STACK_PREFIX:-AIOps}
+echo "스택 접두사: $STACK_PREFIX"
+echo ""
 echo "배포할 스택:"
-echo "  - AIOpsInfrastructure (ECR, IAM, KMS, KB S3)"
-echo "  - AIOpsAgentCore (Runtime, Gateway, Memory)"
+echo "  - ${STACK_PREFIX}Infrastructure (ECR, IAM, KMS, KB S3)"
+echo "  - ${STACK_PREFIX}AgentCore (Runtime, Gateway, Memory)"
 echo ""
 read -p "계속하시겠습니까? (y/n) " -n 1 -r
 echo ""
 
 if [[ $REPLY =~ ^[Yy]$ ]]; then
-    cdk deploy --all --require-approval never
+    STACK_PREFIX=$STACK_PREFIX cdk deploy --all --require-approval never
     
     echo ""
     echo "=========================================="
@@ -68,7 +71,7 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
     echo "다음 단계:"
     echo ""
     echo "1. 로컬 KB를 S3에 동기화:"
-    echo "   KB_BUCKET=\$(aws cloudformation describe-stacks --stack-name AIOpsInfrastructure --query \"Stacks[0].Outputs[?OutputKey=='KBBucketName'].OutputValue\" --output text)"
+    echo "   KB_BUCKET=\$(aws cloudformation describe-stacks --stack-name ${STACK_PREFIX}Infrastructure --query \"Stacks[0].Outputs[?OutputKey=='KBBucketName'].OutputValue\" --output text)"
     echo "   aws s3 sync ../../../knowledge-base s3://\$KB_BUCKET/knowledge-base/"
     echo ""
     echo "2. 환경변수 설정 (.env):"

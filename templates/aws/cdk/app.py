@@ -14,21 +14,27 @@ env = cdk.Environment(
     region=os.environ.get("CDK_DEFAULT_REGION", "us-east-1"),
 )
 
+# 스택 접두사 (기존 리소스와 충돌 방지)
+# 필요시 변경: STACK_PREFIX=myproject ./deploy.sh
+stack_prefix = os.environ.get("STACK_PREFIX", "AIOps")
+
 # 1. 기반 인프라 스택
 infra_stack = InfrastructureStack(
-    app, "AIOpsInfrastructure",
+    app, f"{stack_prefix}Infrastructure",
     env=env,
-    description="AIOps 스타터 킷 - 기반 인프라 (ECR, IAM, KMS)",
+    stack_prefix=stack_prefix,
+    description=f"{stack_prefix} 스타터 킷 - 기반 인프라 (ECR, IAM, KMS, KB S3)",
 )
 
 # 2. AgentCore 스택
 agentcore_stack = AgentCoreStack(
-    app, "AIOpsAgentCore",
+    app, f"{stack_prefix}AgentCore",
     env=env,
     ecr_repo_uri=infra_stack.ecr_repo.repository_uri,
     agent_role_arn=infra_stack.agent_role.role_arn,
     kms_key_arn=infra_stack.kms_key.key_arn,
-    description="AIOps 스타터 킷 - AgentCore (Runtime, Gateway, Memory)",
+    stack_prefix=stack_prefix,
+    description=f"{stack_prefix} 스타터 킷 - AgentCore (Runtime, Gateway, Memory)",
 )
 
 # 의존성 설정

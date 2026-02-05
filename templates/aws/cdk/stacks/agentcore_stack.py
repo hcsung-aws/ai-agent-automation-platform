@@ -31,14 +31,18 @@ class AgentCoreStack(Stack):
         ecr_repo_uri: str,
         agent_role_arn: str,
         kms_key_arn: str,
+        stack_prefix: str = "AIOps",
         **kwargs
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
         
+        # 리소스명 접두사 (소문자)
+        prefix = stack_prefix.lower()
+        
         # === AgentCore Memory (S3 기반) ===
         self.memory_bucket = s3.Bucket(
             self, "AgentMemory",
-            bucket_name=f"aiops-agent-memory-{self.account}-{self.region}",
+            bucket_name=f"{prefix}-agent-memory-{self.account}-{self.region}",
             encryption=s3.BucketEncryption.KMS,
             enforce_ssl=True,
             block_public_access=s3.BlockPublicAccess.BLOCK_ALL,
