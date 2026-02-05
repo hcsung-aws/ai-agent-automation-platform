@@ -27,10 +27,14 @@
 ### 로컬 환경 (5분)
 
 ```bash
-cd templates/local
+git clone https://github.com/your-org/aiops-starter-kit.git
+cd aiops-starter-kit/templates/local
 ./setup.sh
+source .venv/bin/activate
 chainlit run app.py --port 8000
 ```
+
+브라우저에서 http://localhost:8000 접속
 
 → [상세 가이드: QUICKSTART-LOCAL.md](docs/QUICKSTART-LOCAL.md)
 
@@ -55,6 +59,51 @@ kiro chat --agent agent-builder
 
 ---
 
+## 🎬 데모 시나리오
+
+### 시나리오 1: 프로젝트 가이드 챗봇
+
+로컬 환경 실행 후 다음 질문을 해보세요:
+
+| 질문 | 예상 응답 |
+|------|----------|
+| "어떻게 시작해요?" | 설치 및 실행 방법 안내 |
+| "Agent 어떻게 만들어요?" | Agent Builder 사용법 설명 |
+| "프로젝트 구조 보여줘" | 디렉토리 구조 설명 |
+| "AWS에 배포하려면?" | AWS 배포 가이드 안내 |
+
+### 시나리오 2: Knowledge Base 활용
+
+```bash
+# 1. 새 문서 추가
+cat > knowledge-base/devops/my-guide.md << 'EOF'
+# 우리 팀 운영 가이드
+서버 장애 시 담당자: 홍길동
+에스컬레이션: 30분 내 팀장 보고
+EOF
+
+# 2. 질문하기
+"서버 장애 시 누구한테 연락해야 해?"
+→ Agent가 방금 추가한 문서를 검색하여 응답
+```
+
+### 시나리오 3: 새 Agent 생성
+
+```bash
+# Agent Builder 실행
+kiro chat --agent agent-builder
+
+# 요청
+"비용 모니터링 Agent 만들어줘. AWS Cost Explorer 데이터 조회 기능으로"
+
+# Agent Builder가 자동으로:
+# 1. agents/cost_agent.py 생성
+# 2. Supervisor에 연결
+# 3. 테스트 방법 안내
+```
+
+---
+
 ## 📁 프로젝트 구조
 
 ```
@@ -75,9 +124,19 @@ aiops-starter-kit/
 │               ├── infrastructure_stack.py  # ECR, IAM, KMS
 │               └── agentcore_stack.py       # Runtime, Gateway, Memory
 │
+├── knowledge-base/               # 로컬 Knowledge Base
+│   ├── common/                  # 공통 지식
+│   ├── devops/                  # DevOps 가이드
+│   ├── analytics/               # Analytics 가이드
+│   └── monitoring/              # Monitoring 가이드
+│
 ├── src/                          # PoC 구현 (참고용)
 │   ├── agent/                   # Agent 구현 예시
 │   └── tools/                   # 도구 구현 예시
+│
+├── tests/                        # 테스트
+│   ├── test_kb_tools.py         # KB 도구 테스트
+│   └── test_guide_agent.py      # Guide Agent 테스트
 │
 └── docs/                         # 문서
     ├── QUICKSTART-LOCAL.md      # 로컬 배포 가이드
@@ -96,6 +155,24 @@ aiops-starter-kit/
 | [TUTORIAL-FEEDBACK.md](docs/TUTORIAL-FEEDBACK.md) | 피드백 루프 설정 | 20분 |
 | [TUTORIAL-MULTI-AGENT.md](docs/TUTORIAL-MULTI-AGENT.md) | Multi-Agent 구성 | 30분 |
 | [BEST-PRACTICES.md](docs/BEST-PRACTICES.md) | 실패 사례와 교훈 | 15분 |
+| [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | 문제 해결 가이드 | - |
+
+---
+
+## 🧪 테스트
+
+```bash
+# 테스트 실행
+source .venv/bin/activate
+pytest tests/ -v
+
+# 15개 테스트 항목:
+# - KB 로컬 폴백 동작
+# - Agent 검색 기능
+# - 문서 저장 기능
+```
+
+→ [테스트 가이드: tests/README.md](tests/README.md)
 
 ---
 
