@@ -133,12 +133,36 @@ templates/local/
 
 로컬 환경에서는 Bedrock Knowledge Base 없이도 시작할 수 있습니다.
 
-### 동작 방식
+### KB 검색 우선순위
 
-| 환경 변수 | 동작 |
-|----------|------|
-| `KNOWLEDGE_BASE_ID` 미설정 | 로컬 KB만 사용 |
-| `KNOWLEDGE_BASE_ID` 설정 | Bedrock KB 우선, 실패 시 로컬 폴백 |
+```
+1. KNOWLEDGE_BASE_ID 설정 → Bedrock KB (시맨틱 검색)
+2. KB_S3_BUCKET 설정 → S3 직접 검색 (키워드)
+3. LOCAL_KB_PATH 존재 → 로컬 파일 검색 (키워드)
+```
+
+### 환경별 권장 설정
+
+| 환경 | 설정 | 장점 |
+|------|------|------|
+| 로컬 개발 | `LOCAL_KB_PATH` | 빠른 테스트, 즉시 반영 |
+| AWS (초기) | `KB_S3_BUCKET` | 영속성, Bedrock KB 전환 준비 |
+| AWS (프로덕션) | `KNOWLEDGE_BASE_ID` | 시맨틱 검색, 대용량 지원 |
+
+### 점진적 전환 경로
+
+```
+Phase 1: 로컬 KB (개발)
+    knowledge-base/*.md
+        ↓
+Phase 2: S3 KB (AWS 배포)
+    aws s3 sync knowledge-base/ s3://kb-bucket/knowledge-base/
+    → Agent가 S3에서 직접 검색
+        ↓
+Phase 3: Bedrock KB (프로덕션)
+    S3 버킷을 Bedrock KB 데이터 소스로 연결
+    → 시맨틱 검색 활성화
+```
 
 ### 로컬 KB 구조
 
@@ -151,13 +175,6 @@ knowledge-base/
 ```
 
 각 폴더에 `.md` 파일을 추가하면 자동으로 검색 대상이 됩니다.
-
-### KB 연동 시점
-
-다음 상황에서 Bedrock KB 연동을 고려하세요:
-- 문서가 자주 업데이트되는 경우
-- 문서 양이 많아 키워드 검색이 부정확한 경우
-- 시맨틱 검색이 필요한 경우
 
 KB 생성 방법은 [AWS 배포 가이드](QUICKSTART-AWS.md)의 "7단계: Knowledge Base 생성"을 참고하세요.
 

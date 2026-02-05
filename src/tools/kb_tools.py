@@ -56,6 +56,45 @@ def _get_s3_client():
     return _s3_client
 
 
+def _search_s3(query: str, category: str = None) -> str:
+    """S3 버킷에서 .md 파일을 검색 (Bedrock KB 없이 S3 직접 검색)."""
+    if not S3_BUCKET:
+        return ""
+    
+    try:
+        s3 = _get_s3_client()
+        
+        # 검색 대상 카테고리 결정
+        categories = [category] if category and category != "common" else []
+        categories.append("common")
+        
+        results = []
+        query_lower = query.lower()
+        
+        for cat in categories:
+            prefix = f"{S3_PREFIX}/{cat}/"
+            response = s3.list_objects_v2(Bucket=S3_BUCKET, Prefix=prefix)
+            
+            for obj in response.get("Contents", []):
+                key = obj["Key"]
+                if not key.endswith(".md"):
+                    continue
+                
+                # 파일 내용 가져오기
+                file_obj = s3.get_object(Bucket=S3_BUCKET, Key=key)
+                content = file_obj["Body"].read().decode("utf-8")
+                
+                if query_lower in content.lower():
+                    snippet = content[:2000] + "..." if len(content) > 2000 else content
+                    filename = key.split("/")[-1]
+                    results.append(f"[{cat}/{filename}]\n{snippet}")
+        
+        return "\n\n---\n\n".join(results) if results else ""
+    except Exception as e:
+        print(f"⚠️ S3 검색 실패: {e}")
+        return ""
+
+
 def _get_agent_client():
     global _agent_client
     if _agent_client is None:
@@ -64,60 +103,63 @@ def _get_agent_client():
 
 
 def _search_kb(query: str, category: str = None) -> str:
-    """내부 검색 함수 - Bedrock KB 검색, 실패 시 로컬 폴백."""
-    # KB ID 미설정 시 바로 로컬 폴백
-    if not KNOWLEDGE_BASE_ID:
-        return _search_local(query, category)
-    
-    try:
-        client = _get_client()
-        
-        retrieval_config = {
-            "vectorSearchConfiguration": {
-                "numberOfResults": 5
-            }
-        }
-        
-        # 카테고리 필터 적용
-        if category:
-            if category == "common":
-                retrieval_config["vectorSearchConfiguration"]["filter"] = {
-                    "equals": {"key": "category", "value": "common"}
-                }
-            else:
-                # 공통 + 도메인 문서 모두 검색
-                retrieval_config["vectorSearchConfiguration"]["filter"] = {
-                    "orAll": [
-                        {"equals": {"key": "category", "value": "common"}},
-                        {"equals": {"key": "category", "value": category}}
-                    ]
-                }
-        
-        response = client.retrieve(
-            knowledgeBaseId=KNOWLEDGE_BASE_ID,
-            retrievalQuery={"text": query},
-            retrievalConfiguration=retrieval_config
-        )
-        
-        results = []
-        for i, result in enumerate(response.get("retrievalResults", []), 1):
-            content = result.get("content", {}).get("text", "")
-            score = result.get("score", 0)
-            metadata = result.get("metadata", {})
-            cat = metadata.get("category", "unknown")
+    """내부 검색 함수 - Bedrock KB → S3 → 로컬 순서로 폴백."""
+    # 1. Bedrock KB (설정된 경우)
+    if KNOWLEDGE_BASE_ID:
+        try:
+            client = _get_client()
             
-            if score > 0.3:
-                if len(content) > 2000:
-                    content = content[:2000] + "..."
-                results.append(f"[결과 {i}] (관련도: {score:.2f}, 카테고리: {cat})\n{content}")
-        
-        if not results:
-            return "관련 문서를 찾지 못했습니다."
-        
-        return "\n\n---\n\n".join(results)
-    except Exception as e:
-        print(f"⚠️ Bedrock KB 접근 실패, 로컬 폴백: {e}")
-        return _search_local(query, category)
+            retrieval_config = {
+                "vectorSearchConfiguration": {
+                    "numberOfResults": 5
+                }
+            }
+            
+            # 카테고리 필터 적용
+            if category:
+                if category == "common":
+                    retrieval_config["vectorSearchConfiguration"]["filter"] = {
+                        "equals": {"key": "category", "value": "common"}
+                    }
+                else:
+                    retrieval_config["vectorSearchConfiguration"]["filter"] = {
+                        "orAll": [
+                            {"equals": {"key": "category", "value": "common"}},
+                            {"equals": {"key": "category", "value": category}}
+                        ]
+                    }
+            
+            response = client.retrieve(
+                knowledgeBaseId=KNOWLEDGE_BASE_ID,
+                retrievalQuery={"text": query},
+                retrievalConfiguration=retrieval_config
+            )
+            
+            results = []
+            for i, result in enumerate(response.get("retrievalResults", []), 1):
+                content = result.get("content", {}).get("text", "")
+                score = result.get("score", 0)
+                metadata = result.get("metadata", {})
+                cat = metadata.get("category", "unknown")
+                
+                if score > 0.3:
+                    if len(content) > 2000:
+                        content = content[:2000] + "..."
+                    results.append(f"[결과 {i}] (관련도: {score:.2f}, 카테고리: {cat})\n{content}")
+            
+            if results:
+                return "\n\n---\n\n".join(results)
+        except Exception as e:
+            print(f"⚠️ Bedrock KB 접근 실패: {e}")
+    
+    # 2. S3 직접 검색 (Bedrock KB 없이)
+    if S3_BUCKET:
+        s3_result = _search_s3(query, category)
+        if s3_result:
+            return s3_result
+    
+    # 3. 로컬 파일 검색
+    return _search_local(query, category)
 
 
 @tool

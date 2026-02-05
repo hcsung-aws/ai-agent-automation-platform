@@ -1,4 +1,4 @@
-"""Infrastructure Stack - ECR, IAM, KMS 등 기반 인프라.
+"""Infrastructure Stack - ECR, IAM, KMS, KB S3 등 기반 인프라.
 
 AgentCore 배포를 위한 기반 인프라를 구성합니다.
 """
@@ -9,6 +9,7 @@ from aws_cdk import (
     aws_iam as iam,
     aws_kms as kms,
     aws_logs as logs,
+    aws_s3 as s3,
     CfnOutput,
 )
 from constructs import Construct
@@ -37,6 +38,20 @@ class InfrastructureStack(Stack):
             removal_policy=RemovalPolicy.DESTROY,
             empty_on_delete=True,
             image_scan_on_push=True,  # 보안 스캔
+        )
+        
+        # === Knowledge Base S3 버킷 ===
+        # Bedrock KB 없이도 S3에서 직접 검색 가능
+        # 나중에 Bedrock KB 데이터 소스로 연결 가능
+        self.kb_bucket = s3.Bucket(
+            self, "KnowledgeBaseBucket",
+            bucket_name=f"aiops-kb-{self.account}-{self.region}",
+            encryption=s3.BucketEncryption.S3_MANAGED,
+            enforce_ssl=True,
+            block_public_access=s3.BlockPublicAccess.BLOCK_ALL,
+            versioned=True,
+            removal_policy=RemovalPolicy.DESTROY,
+            auto_delete_objects=True,
         )
         
         # === CloudWatch 로그 그룹 ===
@@ -78,6 +93,9 @@ class InfrastructureStack(Stack):
         # KMS 복호화 권한
         self.kms_key.grant_decrypt(self.agent_role)
         
+        # KB S3 버킷 읽기 권한
+        self.kb_bucket.grant_read(self.agent_role)
+        
         # === IAM 역할 (Agent Builder - Kiro CLI) ===
         self.builder_role = iam.Role(
             self, "AgentBuilderRole",
@@ -87,6 +105,9 @@ class InfrastructureStack(Stack):
         
         # ECR 푸시 권한
         self.ecr_repo.grant_pull_push(self.builder_role)
+        
+        # KB S3 버킷 읽기/쓰기 권한
+        self.kb_bucket.grant_read_write(self.builder_role)
         
         # AgentCore 관리 권한
         self.builder_role.add_to_policy(iam.PolicyStatement(
@@ -115,4 +136,9 @@ class InfrastructureStack(Stack):
         CfnOutput(self, "KMSKeyArn",
             value=self.kms_key.key_arn,
             description="암호화 키 ARN",
+        )
+        
+        CfnOutput(self, "KBBucketName",
+            value=self.kb_bucket.bucket_name,
+            description="Knowledge Base S3 버킷 (Bedrock KB 없이 직접 검색 가능)",
         )
