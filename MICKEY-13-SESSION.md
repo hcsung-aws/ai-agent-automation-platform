@@ -1,15 +1,11 @@
 # Mickey 13 Session Log
-Date: 2026-02-05 01:27 ~ 13:10
+Date: 2026-02-05 01:27 ~ 13:48
 
 ## Session Goal
 - KB 문서화 및 로컬 폴백 구현
 - 문서/테스트 보강
 - S3 KB 직접 검색 지원 (Bedrock KB 없이)
-
-## Previous Context (Mickey 12)
-- AIOps 스타터 킷 패키징 완료
-- 로컬/AWS 배포 템플릿 생성
-- Mickey 시스템 프롬프트 v5.5
+- CDK 배포 테스트 준비
 
 ## Progress
 
@@ -40,7 +36,11 @@ Date: 2026-02-05 01:27 ~ 13:10
    - kb_tools.py: _search_s3() 추가
    - 폴백 순서: Bedrock KB → S3 → 로컬
    - infrastructure_stack.py: KB용 S3 버킷 추가
-   - 점진적 전환 경로 문서화
+   - context_rule/kb-design-guide.md 작성
+
+7. ✅ CDK 배포 테스트 준비
+   - us-east-1 기존 리소스 충돌 없음 확인
+   - STACK_PREFIX 환경변수 추가 (충돌 방지)
 
 ## Key Decisions
 
@@ -49,36 +49,35 @@ Date: 2026-02-05 01:27 ~ 13:10
 - Chosen: Bedrock KB → S3 직접 검색 → 로컬 파일 순서로 폴백
 - Reasoning: 점진적 전환 가능, 같은 S3 버킷을 나중에 Bedrock KB 데이터 소스로 재사용
 
-### Decision 2: guide_agent KB 방식
-- Problem: 하드코딩 vs KB 연동
-- Chosen: 로컬 KB 폴백 방식
-- Reasoning: 사용자가 knowledge-base/에 문서 추가하면 즉시 반영, 점진적 개선 가능
+### Decision 2: KB 설계 핵심 원칙
+- KB 없이도 동작해야 한다
+- KB는 나중에 쉽게 연결할 수 있어야 한다
+
+### Decision 3: CDK 리소스 명명
+- STACK_PREFIX 환경변수로 리소스명 제어
+- 기본값: AIOps
+- 기존 리소스 충돌 방지
 
 ## Files Modified
 
 ### Created
-- knowledge-base/README.md
-- knowledge-base/common/quickstart.md
-- knowledge-base/common/agent-builder.md
-- knowledge-base/common/aws-deploy.md
+- knowledge-base/common/quickstart.md, agent-builder.md, aws-deploy.md
 - knowledge-base/devops/incident-guide.md
 - templates/local/.env.example
-- tests/conftest.py
-- tests/test_kb_tools.py
-- tests/test_guide_agent.py
-- tests/README.md
+- tests/conftest.py, test_kb_tools.py, test_guide_agent.py, README.md
 - docs/TROUBLESHOOTING.md
+- context_rule/kb-design-guide.md
 
 ### Modified
-- src/tools/kb_tools.py (환경변수 기반, S3 검색, 로컬 폴백)
+- src/tools/kb_tools.py (S3 검색, 폴백 체인)
 - templates/local/setup.sh (에러 처리 강화)
 - templates/local/agents/guide_agent.py (KB 연동)
-- templates/aws/cdk/stacks/infrastructure_stack.py (KB S3 버킷)
-- templates/aws/deploy.sh (KB S3 동기화 안내)
-- docs/QUICKSTART-LOCAL.md (KB 가이드, 점진적 전환)
-- docs/QUICKSTART-AWS.md (KB 생성 가이드)
-- README.md (데모 시나리오, 테스트 섹션)
-- .env.example (S3 KB 설정)
+- templates/aws/cdk/app.py (STACK_PREFIX)
+- templates/aws/cdk/stacks/infrastructure_stack.py (KB S3, prefix)
+- templates/aws/cdk/stacks/agentcore_stack.py (prefix)
+- templates/aws/deploy.sh (STACK_PREFIX)
+- docs/QUICKSTART-LOCAL.md, QUICKSTART-AWS.md
+- README.md
 
 ## Lessons Learned
 
@@ -88,9 +87,9 @@ Date: 2026-02-05 01:27 ~ 13:10
 - Benefit: 로컬 → S3 → Bedrock KB 순서로 점진적 전환 가능
 
 ## Context Window
-- Current: ~15%
+- Current: ~20%
 - Status: Safe
 
 ## Next Steps
-1. AWS CDK 배포 테스트
+1. AWS CDK 배포 테스트 (실행)
 2. v2.0 스케줄러 구현 (EventBridge + Lambda)
