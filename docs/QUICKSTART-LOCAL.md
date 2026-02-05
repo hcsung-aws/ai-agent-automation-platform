@@ -26,6 +26,29 @@ cd aiops-starter-kit/templates/local
 - 의존성 설치 (strands-agents, chainlit, boto3)
 - AWS 자격증명 확인
 
+## 2-1단계: 환경 변수 설정 (선택)
+
+```bash
+cp .env.example .env
+```
+
+`.env` 파일 편집:
+
+```bash
+# AWS 리전
+AWS_REGION=us-east-1
+
+# Bedrock KB 사용 시 (선택 - 미설정 시 로컬 KB 사용)
+KNOWLEDGE_BASE_ID=your-kb-id
+KB_DATA_SOURCE_ID=your-datasource-id
+KB_S3_BUCKET=your-bucket-name
+
+# 로컬 KB 경로 (기본값: ./knowledge-base)
+LOCAL_KB_PATH=./knowledge-base
+```
+
+> 💡 **KB 미설정 시**: 로컬 `knowledge-base/` 디렉토리의 마크다운 파일을 검색합니다.
+
 ## 3단계: 서버 실행 (1분)
 
 ```bash
@@ -110,16 +133,121 @@ templates/local/
 
 로컬 환경에서는 Bedrock Knowledge Base 없이도 시작할 수 있습니다.
 
-### 현재 구현 (하드코딩)
+### 동작 방식
 
-`agents/guide_agent.py`의 `search_project_docs` 함수는 하드코딩된 문서를 반환합니다.
-빠른 테스트에는 충분하지만, 실제 운영에는 KB 연동이 권장됩니다.
+| 환경 변수 | 동작 |
+|----------|------|
+| `KNOWLEDGE_BASE_ID` 미설정 | 로컬 KB만 사용 |
+| `KNOWLEDGE_BASE_ID` 설정 | Bedrock KB 우선, 실패 시 로컬 폴백 |
+
+### 로컬 KB 구조
+
+```
+knowledge-base/
+├── common/       # 공통 지식
+├── devops/       # DevOps 가이드
+├── analytics/    # Analytics 가이드
+└── monitoring/   # Monitoring 가이드
+```
+
+각 폴더에 `.md` 파일을 추가하면 자동으로 검색 대상이 됩니다.
 
 ### KB 연동 시점
 
 다음 상황에서 Bedrock KB 연동을 고려하세요:
 - 문서가 자주 업데이트되는 경우
-- 문서 양이 많아 하드코딩이 어려운 경우
-- AWS 배포 후 프로덕션 운영 시
+- 문서 양이 많아 키워드 검색이 부정확한 경우
+- 시맨틱 검색이 필요한 경우
 
 KB 생성 방법은 [AWS 배포 가이드](QUICKSTART-AWS.md)의 "7단계: Knowledge Base 생성"을 참고하세요.
+
+---
+
+## 부록: Knowledge Base에 정보 추가하기
+
+Agent가 참조하는 지식을 추가하고 확인하는 방법입니다.
+
+### 로컬 환경 (즉시 반영)
+
+**1. 마크다운 파일 추가**
+
+```bash
+# 예: 새 운영 가이드 추가
+cat > knowledge-base/devops/new-guide.md << 'EOF'
+# 새 운영 가이드
+
+## 개요
+이 문서는 새로운 운영 절차를 설명합니다.
+
+## 절차
+1. 첫 번째 단계
+2. 두 번째 단계
+EOF
+```
+
+**2. 즉시 확인 (서버 재시작 불필요)**
+
+```
+질문: "새 운영 가이드 알려줘"
+→ Agent가 방금 추가한 문서 내용을 검색하여 응답
+```
+
+**3. 카테고리별 폴더 구조**
+
+| 폴더 | 용도 | 예시 |
+|------|------|------|
+| `common/` | 공통 지식, 정책 | 조직 정보, 에스컬레이션 |
+| `devops/` | 운영 가이드 | 장애 대응, 배포 절차 |
+| `analytics/` | 분석 가이드 | 쿼리 패턴, 지표 정의 |
+| `monitoring/` | 모니터링 가이드 | 알람 설정, 임계값 |
+
+### AWS 환경 (Bedrock KB)
+
+**1. S3에 문서 업로드**
+
+```bash
+# 문서 작성
+echo "# 새 가이드 내용" > new-guide.md
+
+# S3 업로드
+aws s3 cp new-guide.md s3://$KB_S3_BUCKET/docs/
+```
+
+**2. KB 동기화 실행**
+
+```bash
+# 동기화 시작
+aws bedrock-agent start-ingestion-job \
+  --knowledge-base-id $KNOWLEDGE_BASE_ID \
+  --data-source-id $KB_DATA_SOURCE_ID
+
+# 상태 확인 (COMPLETE가 될 때까지 대기)
+aws bedrock-agent list-ingestion-jobs \
+  --knowledge-base-id $KNOWLEDGE_BASE_ID \
+  --data-source-id $KB_DATA_SOURCE_ID \
+  --query "ingestionJobSummaries[0].status"
+```
+
+> ⏱️ 동기화에 30초~1분 소요됩니다.
+
+**3. 검색 테스트**
+
+```bash
+aws bedrock-agent-runtime retrieve \
+  --knowledge-base-id $KNOWLEDGE_BASE_ID \
+  --retrieval-query '{"text": "새 가이드"}'
+```
+
+### 로컬 ↔ AWS 동기화
+
+로컬에서 작성한 문서를 AWS에도 반영하려면:
+
+```bash
+# 로컬 KB → S3 업로드
+aws s3 sync ./knowledge-base s3://$KB_S3_BUCKET/knowledge-base/
+
+# KB 동기화
+aws bedrock-agent start-ingestion-job \
+  --knowledge-base-id $KNOWLEDGE_BASE_ID \
+  --data-source-id $KB_DATA_SOURCE_ID
+```

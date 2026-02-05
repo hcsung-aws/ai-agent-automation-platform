@@ -5,10 +5,11 @@ from pathlib import Path
 import boto3
 from strands import tool
 
-KNOWLEDGE_BASE_ID = "H50SNRJBFF"
-DATA_SOURCE_ID = "OSFG10XDDN"
-S3_BUCKET = "devops-agent-kb-965037532757"
-S3_PREFIX = "knowledge-base"
+# 환경변수에서 설정 로드
+KNOWLEDGE_BASE_ID = os.environ.get("KNOWLEDGE_BASE_ID", "")
+DATA_SOURCE_ID = os.environ.get("KB_DATA_SOURCE_ID", "")
+S3_BUCKET = os.environ.get("KB_S3_BUCKET", "")
+S3_PREFIX = os.environ.get("KB_S3_PREFIX", "knowledge-base")
 LOCAL_KB_PATH = Path(os.environ.get("LOCAL_KB_PATH", "knowledge-base"))
 
 _client = None
@@ -64,6 +65,10 @@ def _get_agent_client():
 
 def _search_kb(query: str, category: str = None) -> str:
     """내부 검색 함수 - Bedrock KB 검색, 실패 시 로컬 폴백."""
+    # KB ID 미설정 시 바로 로컬 폴백
+    if not KNOWLEDGE_BASE_ID:
+        return _search_local(query, category)
+    
     try:
         client = _get_client()
         
@@ -227,19 +232,20 @@ def add_kb_document(category: str, filename: str, content: str, doc_type: str = 
     local_file.write_text(content, encoding="utf-8")
     results.append(f"✅ 로컬 저장: {local_file}")
     
-    # S3 업로드 (가능한 경우)
-    try:
-        s3 = _get_s3_client()
-        doc_key = f"{S3_PREFIX}/{category}/{filename}"
-        s3.put_object(Bucket=S3_BUCKET, Key=doc_key, Body=content.encode("utf-8"))
-        
-        metadata = {"metadataAttributes": {"category": category, "doc_type": doc_type}}
-        meta_key = f"{doc_key}.metadata.json"
-        s3.put_object(Bucket=S3_BUCKET, Key=meta_key, Body=json.dumps(metadata).encode("utf-8"))
-        results.append(f"✅ S3 업로드: s3://{S3_BUCKET}/{doc_key}")
-        results.append("\n💡 KB에 반영하려면 trigger_kb_sync()를 호출하세요.")
-    except Exception as e:
-        results.append(f"⚠️ S3 업로드 실패 (로컬만 저장됨): {e}")
+    # S3 업로드 (설정된 경우만)
+    if S3_BUCKET:
+        try:
+            s3 = _get_s3_client()
+            doc_key = f"{S3_PREFIX}/{category}/{filename}"
+            s3.put_object(Bucket=S3_BUCKET, Key=doc_key, Body=content.encode("utf-8"))
+            
+            metadata = {"metadataAttributes": {"category": category, "doc_type": doc_type}}
+            meta_key = f"{doc_key}.metadata.json"
+            s3.put_object(Bucket=S3_BUCKET, Key=meta_key, Body=json.dumps(metadata).encode("utf-8"))
+            results.append(f"✅ S3 업로드: s3://{S3_BUCKET}/{doc_key}")
+            results.append("\n💡 KB에 반영하려면 trigger_kb_sync()를 호출하세요.")
+        except Exception as e:
+            results.append(f"⚠️ S3 업로드 실패 (로컬만 저장됨): {e}")
     
     return "\n".join(results)
 
@@ -253,6 +259,9 @@ def trigger_kb_sync() -> str:
     Returns:
         동기화 작업 상태
     """
+    if not KNOWLEDGE_BASE_ID or not DATA_SOURCE_ID:
+        return "⚠️ KB 동기화 불가: KNOWLEDGE_BASE_ID 또는 KB_DATA_SOURCE_ID가 설정되지 않았습니다."
+    
     client = _get_agent_client()
     
     response = client.start_ingestion_job(

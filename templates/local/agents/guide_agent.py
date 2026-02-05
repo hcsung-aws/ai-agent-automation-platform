@@ -9,11 +9,43 @@
 - 로컬/AWS 배포 단계별 가이드
 - 트러블슈팅 지원
 """
+import os
+from pathlib import Path
 from strands import Agent, tool
 from strands.models import BedrockModel
 
+# KB 설정 (환경변수)
+KNOWLEDGE_BASE_ID = os.environ.get("KNOWLEDGE_BASE_ID", "")
+LOCAL_KB_PATH = Path(os.environ.get("LOCAL_KB_PATH", "knowledge-base"))
 
-# 프로젝트 문서 검색 도구 (KB 연동 시 교체)
+_bedrock_client = None
+
+
+def _get_bedrock_client():
+    global _bedrock_client
+    if _bedrock_client is None:
+        import boto3
+        _bedrock_client = boto3.client("bedrock-agent-runtime", region_name="us-east-1")
+    return _bedrock_client
+
+
+def _search_local_kb(query: str) -> str:
+    """로컬 KB에서 키워드 검색."""
+    if not LOCAL_KB_PATH.exists():
+        return ""
+    
+    results = []
+    query_lower = query.lower()
+    
+    for md_file in LOCAL_KB_PATH.rglob("*.md"):
+        content = md_file.read_text(encoding="utf-8")
+        if query_lower in content.lower():
+            snippet = content[:2000] + "..." if len(content) > 2000 else content
+            results.append(f"[{md_file.relative_to(LOCAL_KB_PATH)}]\n{snippet}")
+    
+    return "\n\n---\n\n".join(results) if results else ""
+
+
 @tool
 def search_project_docs(query: str) -> str:
     """프로젝트 문서에서 관련 내용을 검색합니다.
@@ -24,82 +56,30 @@ def search_project_docs(query: str) -> str:
     Returns:
         관련 문서 내용
     """
-    # TODO: Bedrock KB 연동 시 실제 검색으로 교체
-    # 연동 방법: docs/QUICKSTART-AWS.md "7단계: Knowledge Base 생성" 참고
-    #
-    # KB 연동 코드 예시:
-    # import boto3
-    # client = boto3.client('bedrock-agent-runtime')
-    # response = client.retrieve(
-    #     knowledgeBaseId='YOUR_KB_ID',
-    #     retrievalQuery={'text': query}
-    # )
-    # return response['retrievalResults'][0]['content']['text']
-    docs = {
-        "시작": """
-## 빠른 시작
-1. 저장소 클론: git clone [repo-url]
-2. 설치: ./templates/local/setup.sh
-3. 실행: chainlit run app.py --port 8000
-4. 브라우저에서 http://localhost:8000 접속
-""",
-        "agent builder": """
-## Agent Builder 사용법
-1. Kiro CLI 실행: kiro chat --agent agent-builder
-2. 자연어로 요청: "CloudWatch 알람을 조회하는 Monitoring Agent 만들어줘"
-3. Agent Builder가 코드 생성 및 등록
-4. 테스트 후 피드백으로 개선
-""",
-        "로컬 배포": """
-## 로컬 배포 가이드
-1. Python 3.10+ 필요
-2. ./templates/local/setup.sh 실행
-3. .env 파일에 AWS 자격증명 설정
-4. chainlit run app.py 실행
-""",
-        "aws 배포": """
-## AWS 배포 가이드 (AgentCore)
-1. AWS CLI 설정 확인
-2. cd templates/aws && ./deploy.sh
-3. AgentCore Runtime에 Agent 배포됨
-4. Gateway로 도구 연결
-5. Memory로 대화 컨텍스트 유지
-""",
-        "agent 만들기": """
-## 새 Agent 만들기
-1. Agent Builder 사용 (권장):
-   kiro chat --agent agent-builder
-   "HR Agent 만들어줘. 휴가 조회 기능으로"
-
-2. 직접 작성:
-   - templates/local/agents/example_agent.py 참고
-   - @tool 데코레이터로 도구 정의
-   - SYSTEM_PROMPT에 역할 명시
-   - create_xxx_agent() 함수 작성
-""",
-        "supervisor": """
-## Supervisor 구조
-Supervisor는 여러 전문 Agent를 조율합니다:
-- 사용자 요청 분석
-- 적절한 Agent에게 위임
-- 결과 종합하여 응답
-
-예: "서버 장애가 매출에 영향을 줬는지 분석해줘"
-→ DevOps Agent (장애 확인) + Analytics Agent (매출 분석)
-""",
-    }
+    # 1. Bedrock KB 시도 (설정된 경우)
+    if KNOWLEDGE_BASE_ID:
+        try:
+            client = _get_bedrock_client()
+            response = client.retrieve(
+                knowledgeBaseId=KNOWLEDGE_BASE_ID,
+                retrievalQuery={"text": query},
+                retrievalConfiguration={"vectorSearchConfiguration": {"numberOfResults": 3}}
+            )
+            results = []
+            for r in response.get("retrievalResults", []):
+                if r.get("score", 0) > 0.3:
+                    results.append(r.get("content", {}).get("text", ""))
+            if results:
+                return "\n\n---\n\n".join(results)
+        except Exception as e:
+            print(f"⚠️ Bedrock KB 접근 실패: {e}")
     
-    query_lower = query.lower()
-    for key, content in docs.items():
-        if key in query_lower:
-            return content
+    # 2. 로컬 KB 폴백
+    local_result = _search_local_kb(query)
+    if local_result:
+        return local_result
     
-    return """관련 문서를 찾지 못했습니다. 다음 주제로 질문해보세요:
-- 시작 / 빠른 시작
-- Agent Builder 사용법
-- 로컬 배포 / AWS 배포
-- Agent 만들기
-- Supervisor 구조"""
+    return "관련 문서를 찾지 못했습니다. knowledge-base/ 폴더에 .md 파일을 추가하세요."
 
 
 @tool
@@ -125,20 +105,18 @@ aiops-starter-kit/
 │   └── aws/                   # AWS 배포용
 │       ├── deploy.sh         # 배포 스크립트
 │       └── cdk/              # CDK 스택
-│           └── stacks/
-│               ├── infrastructure_stack.py
-│               └── agentcore_stack.py
 │
-├── src/                       # PoC 구현 (참고용)
-│   ├── agent/                # Agent 구현 예시
-│   └── tools/                # 도구 구현 예시
+├── knowledge-base/            # 로컬 KB (문서 추가 가능)
+│   ├── common/
+│   ├── devops/
+│   ├── analytics/
+│   └── monitoring/
 │
 ├── docs/                      # 문서
 │   ├── QUICKSTART-LOCAL.md
 │   └── QUICKSTART-AWS.md
 │
 └── context_rule/              # Agent Builder 가이드
-    └── agent-builder-guide.md
 ```
 """
 

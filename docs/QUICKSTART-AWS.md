@@ -189,7 +189,19 @@ aws bedrock-agent associate-agent-knowledge-base \
 aws bedrock-agent prepare-agent --agent-id $AGENT_ID
 ```
 
-### 7-5. KB 검색 테스트
+### 7-5. 환경 변수 설정
+
+`.env` 파일에 KB 정보 추가:
+
+```bash
+# Bedrock Knowledge Base
+KNOWLEDGE_BASE_ID=your-kb-id        # 위에서 확인한 $KB_ID
+KB_DATA_SOURCE_ID=your-ds-id        # 위에서 확인한 $DS_ID
+KB_S3_BUCKET=aiops-kb-docs-xxx      # 문서 업로드한 S3 버킷
+KB_S3_PREFIX=docs                   # S3 내 문서 경로
+```
+
+### 7-6. KB 검색 테스트
 
 ```bash
 # KB 직접 검색 테스트
