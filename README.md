@@ -115,7 +115,11 @@ aiops-starter-kit/
 │   │   ├── agent-builder.json   # Kiro CLI 연동
 │   │   └── agents/
 │   │       ├── supervisor.py    # Multi-Agent 조율
-│   │       └── guide_agent.py   # 프로젝트 가이드 챗봇
+│   │       ├── guide_agent.py   # 프로젝트 가이드 챗봇
+│   │       ├── main.py          # AgentCore HTTP 서버
+│   │       ├── handler.py       # 요청 핸들러
+│   │       ├── Dockerfile       # 컨테이너 빌드
+│   │       └── requirements.txt # Agent 의존성
 │   │
 │   └── aws/                      # AWS 배포 템플릿
 │       ├── deploy.sh            # 배포 스크립트

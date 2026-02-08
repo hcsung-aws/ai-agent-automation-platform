@@ -14,7 +14,7 @@ def _get_guide_agent():
     """Guide Agent를 지연 초기화합니다."""
     global _guide_agent
     if _guide_agent is None:
-        from agents.guide_agent import create_guide_agent
+        from guide_agent import create_guide_agent
         _guide_agent = create_guide_agent()
     return _guide_agent
 

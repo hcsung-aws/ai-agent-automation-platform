@@ -1,5 +1,6 @@
 # Core dependencies
-aws-cdk-lib>=2.100.0
+aws-cdk-lib>=2.237.0
+aws-cdk.aws-bedrock-agentcore-alpha>=2.237.0a0
 constructs>=10.0.0
 
 # Agent framework

@@ -10,15 +10,22 @@
 - 트러블슈팅 지원
 """
 import os
+import logging
 from pathlib import Path
 from strands import Agent, tool
 from strands.models import BedrockModel
 
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
+
 # KB 설정 (환경변수)
 KNOWLEDGE_BASE_ID = os.environ.get("KNOWLEDGE_BASE_ID", "")
+KB_S3_BUCKET = os.environ.get("KB_S3_BUCKET", "")
+KB_S3_PREFIX = os.environ.get("KB_S3_PREFIX", "knowledge-base")
 LOCAL_KB_PATH = Path(os.environ.get("LOCAL_KB_PATH", "knowledge-base"))
 
 _bedrock_client = None
+_s3_client = None
 
 
 def _get_bedrock_client():
@@ -29,19 +36,68 @@ def _get_bedrock_client():
     return _bedrock_client
 
 
+def _get_s3_client():
+    global _s3_client
+    if _s3_client is None:
+        import boto3
+        _s3_client = boto3.client("s3", region_name="us-east-1")
+    return _s3_client
+
+
+def _search_s3_kb(query: str) -> str:
+    """S3 버킷에서 .md 파일 검색 (Bedrock KB 없이 영속적 저장소)."""
+    if not KB_S3_BUCKET:
+        return ""
+    
+    try:
+        s3 = _get_s3_client()
+        results = []
+        # 단어 단위 매칭 (2자 이상 단어만)
+        keywords = [w for w in query.lower().split() if len(w) >= 2]
+        
+        response = s3.list_objects_v2(Bucket=KB_S3_BUCKET, Prefix=KB_S3_PREFIX)
+        for obj in response.get("Contents", []):
+            key = obj["Key"]
+            if not key.endswith(".md"):
+                continue
+            
+            file_obj = s3.get_object(Bucket=KB_S3_BUCKET, Key=key)
+            content = file_obj["Body"].read().decode("utf-8")
+            content_lower = content.lower()
+            
+            # 키워드 중 하나라도 매칭되면 포함
+            matched = sum(1 for kw in keywords if kw in content_lower)
+            if matched > 0:
+                snippet = content[:2000] + "..." if len(content) > 2000 else content
+                filename = key.replace(KB_S3_PREFIX + "/", "")
+                results.append((matched, f"[{filename}]\n{snippet}"))
+        
+        # 매칭 수 기준 정렬 (많이 매칭된 것 우선)
+        results.sort(key=lambda x: x[0], reverse=True)
+        return "\n\n---\n\n".join(r[1] for r in results) if results else ""
+    except Exception as e:
+        print(f"⚠️ S3 검색 실패: {e}")
+        return ""
+
+
 def _search_local_kb(query: str) -> str:
     """로컬 KB에서 키워드 검색."""
     if not LOCAL_KB_PATH.exists():
         return ""
     
     results = []
-    query_lower = query.lower()
+    keywords = [w for w in query.lower().split() if len(w) >= 2]
     
     for md_file in LOCAL_KB_PATH.rglob("*.md"):
         content = md_file.read_text(encoding="utf-8")
-        if query_lower in content.lower():
+        content_lower = content.lower()
+        matched = sum(1 for kw in keywords if kw in content_lower)
+        if matched > 0:
             snippet = content[:2000] + "..." if len(content) > 2000 else content
-            results.append(f"[{md_file.relative_to(LOCAL_KB_PATH)}]\n{snippet}")
+            results.append((matched, f"[{md_file.relative_to(LOCAL_KB_PATH)}]\n{snippet}"))
+    
+    results.sort(key=lambda x: x[0], reverse=True)
+    return "\n\n---\n\n".join(r[1] for r in results) if results else ""
     
     return "\n\n---\n\n".join(results) if results else ""
 
@@ -55,8 +111,13 @@ def search_project_docs(query: str) -> str:
     
     Returns:
         관련 문서 내용
+    
+    검색 우선순위: Bedrock KB → S3 → 로컬
     """
-    # 1. Bedrock KB 시도 (설정된 경우)
+    print(f"[KB] search_project_docs called: query='{query}'")
+    print(f"[KB] KNOWLEDGE_BASE_ID='{KNOWLEDGE_BASE_ID}', KB_S3_BUCKET='{KB_S3_BUCKET}', LOCAL_KB_PATH='{LOCAL_KB_PATH}'")
+    
+    # 1. Bedrock KB (설정된 경우)
     if KNOWLEDGE_BASE_ID:
         try:
             client = _get_bedrock_client()
@@ -74,11 +135,23 @@ def search_project_docs(query: str) -> str:
         except Exception as e:
             print(f"⚠️ Bedrock KB 접근 실패: {e}")
     
-    # 2. 로컬 KB 폴백
+    # 2. S3 폴백 (AWS 환경에서 영속적 저장소)
+    s3_result = _search_s3_kb(query)
+    if s3_result:
+        print(f"[KB] S3 hit: {len(s3_result)} chars")
+        return s3_result
+    else:
+        print("[KB] S3 miss")
+    
+    # 3. 로컬 KB 폴백
     local_result = _search_local_kb(query)
     if local_result:
+        print(f"[KB] Local hit: {len(local_result)} chars")
         return local_result
+    else:
+        print("[KB] Local miss")
     
+    print("[KB] No results found")
     return "관련 문서를 찾지 못했습니다. knowledge-base/ 폴더에 .md 파일을 추가하세요."
 
 

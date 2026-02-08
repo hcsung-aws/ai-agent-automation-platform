@@ -120,7 +120,11 @@ templates/local/
 ├── agent-builder.json    # Kiro CLI Agent Builder 설정
 └── agents/
     ├── supervisor.py     # Supervisor (Agent 조율)
-    └── guide_agent.py    # 프로젝트 가이드 챗봇
+    ├── guide_agent.py    # 프로젝트 가이드 챗봇
+    ├── main.py           # AgentCore HTTP 서버
+    ├── handler.py        # 요청 핸들러
+    ├── Dockerfile        # 컨테이너 빌드
+    └── requirements.txt  # Agent 의존성
 ```
 
 ---

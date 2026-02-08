@@ -1,22 +1,31 @@
-# Common Knowledge Base
+# Common Knowledge Index
 
-## Quick Start for New Mickey
-1. Read PROJECT-OVERVIEW.md
-2. Read ENVIRONMENT.md
-3. Read context_rule/project-context.md
-4. Read latest MICKEY-N-SESSION.md
-5. Read latest MICKEY-N-HANDOFF.md (if exists)
+프로젝트 무관 재사용 패턴의 지식 지도. Mickey는 세션 시작 시 이 INDEX를 읽고, 작업 중 트리거 조건에 매칭되면 해당 파일만 로딩한다.
 
-## Knowledge Areas
+## Knowledge Map
 
-### AWS/AgentCore
-- agentcore-overview.md (예정)
+| 트리거 | 파일 | 요약 |
+|--------|------|------|
+| (현재 등록된 지식 파일 없음) | - | - |
 
-### Architecture
-- multi-agent-patterns.md (예정)
+## 등록 대상 기준
 
-## Cross-References
-- context_rule/project-context.md: 프로젝트 컨텍스트
+다음 조건에 해당하면 common_knowledge에 파일로 저장:
+- 프로젝트와 무관하게 재사용 가능한 패턴
+- 기술 비교/선택 기준 (예: 프레임워크 비교)
+- 아키텍처 패턴 (예: Multi-Agent 패턴)
+- 범용 트러블슈팅 (예: WSL + Docker 이슈)
+
+## 프로젝트 특화 지식과의 구분
+
+- 이 프로젝트에서만 유효한 규칙 → `context_rule/`에 저장
+- 다른 프로젝트에서도 재사용 가능한 패턴 → `common_knowledge/`에 저장
+
+## 사용 규칙
+
+1. 작업 중 재사용 가능한 패턴 발견 시 파일 생성 + 이 INDEX에 등록
+2. INDEX에 없는 파일은 로딩하지 않음
+3. 트리거 키워드는 구체적으로 작성 (너무 넓으면 불필요한 로딩 발생)
 
 ## Last Updated
-Mickey 1 - 2026-01-30
+Mickey 18 - 2026-02-09

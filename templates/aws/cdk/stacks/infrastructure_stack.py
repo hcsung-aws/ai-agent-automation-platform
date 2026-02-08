@@ -27,9 +27,14 @@ class InfrastructureStack(Stack):
         # === KMS 키 (암호화) ===
         self.kms_key = kms.Key(
             self, "AgentCoreKey",
-            description=f"{stack_prefix} Agent 암호화 키",
+            description=f"{stack_prefix} Agent encryption key",
             enable_key_rotation=True,
             removal_policy=RemovalPolicy.RETAIN,
+        )
+        
+        # CloudWatch Logs가 KMS 키를 사용할 수 있도록 권한 부여
+        self.kms_key.grant_encrypt_decrypt(
+            iam.ServicePrincipal(f"logs.{self.region}.amazonaws.com")
         )
         
         # === ECR 리포지토리 (Agent 컨테이너) ===
@@ -70,7 +75,7 @@ class InfrastructureStack(Stack):
         self.agent_role = iam.Role(
             self, "AgentCoreRole",
             assumed_by=iam.ServicePrincipal("bedrock.amazonaws.com"),
-            description="AgentCore Runtime 실행 역할",
+            description="AgentCore Runtime execution role",
         )
         
         # Bedrock 모델 호출 권한
@@ -103,7 +108,7 @@ class InfrastructureStack(Stack):
         self.builder_role = iam.Role(
             self, "AgentBuilderRole",
             assumed_by=iam.AccountPrincipal(self.account),
-            description="Agent Builder (Kiro CLI) 역할",
+            description="Agent Builder (Kiro CLI) role",
         )
         
         # ECR 푸시 권한

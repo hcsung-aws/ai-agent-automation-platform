@@ -1,26 +1,24 @@
 """AgentCore Stack - Runtime, Gateway, Memory 구성.
 
-Amazon Bedrock AgentCore를 활용한 Agent 배포 스택입니다.
+Amazon Bedrock AgentCore L2 Construct를 활용한 Agent 배포 스택입니다.
+Strands Agent를 컨테이너로 패키징하여 AgentCore Runtime에 배포합니다.
 """
+from pathlib import Path
 from aws_cdk import (
     Stack,
-    Duration,
-    aws_iam as iam,
-    aws_lambda as lambda_,
-    aws_s3 as s3,
     CfnOutput,
-    CustomResource,
-    custom_resources as cr,
+    aws_iam as iam,
+    aws_s3 as s3,
 )
 from constructs import Construct
+import aws_cdk.aws_bedrock_agentcore_alpha as agentcore
 
 
 class AgentCoreStack(Stack):
-    """AgentCore 배포 스택.
+    """AgentCore 배포 스택 (L2 Construct 사용).
     
     구성 요소:
-    - AgentCore Runtime: Agent 컨테이너 호스팅
-    - AgentCore Gateway: Lambda 도구를 MCP 호환으로 변환
+    - AgentCore Runtime: Strands Agent 컨테이너 호스팅
     - AgentCore Memory: 대화 컨텍스트 유지
     """
     
@@ -31,6 +29,7 @@ class AgentCoreStack(Stack):
         ecr_repo_uri: str,
         agent_role_arn: str,
         kms_key_arn: str,
+        kb_bucket: s3.IBucket,
         stack_prefix: str = "AIOps",
         **kwargs
     ) -> None:
@@ -39,100 +38,61 @@ class AgentCoreStack(Stack):
         # 리소스명 접두사 (소문자)
         prefix = stack_prefix.lower()
         
-        # === AgentCore Memory (S3 기반) ===
-        self.memory_bucket = s3.Bucket(
+        # Agent 코드 경로 (로컬 템플릿의 agents 디렉토리)
+        agent_path = Path(__file__).parent.parent.parent.parent / "local" / "agents"
+        
+        # === AgentCore Runtime ===
+        # 로컬 Dockerfile에서 자동 빌드/푸시
+        self.runtime = agentcore.Runtime(
+            self, "SupervisorRuntime",
+            runtime_name=f"{prefix}_supervisor",
+            agent_runtime_artifact=agentcore.AgentRuntimeArtifact.from_asset(
+                str(agent_path)
+            ),
+            description="AIOps Supervisor Agent - Multi-Agent 협업 조율",
+            environment_variables={
+                "KNOWLEDGE_BASE_ID": "",  # 배포 후 Bedrock KB 설정 시 추가
+                "KB_S3_BUCKET": kb_bucket.bucket_name,  # S3 폴백용
+                "KB_S3_PREFIX": "knowledge-base",
+                "LOCAL_KB_PATH": "/app/knowledge-base",
+            },
+        )
+        
+        # Bedrock 모델 호출 권한
+        self.runtime.add_to_role_policy(iam.PolicyStatement(
+            effect=iam.Effect.ALLOW,
+            actions=[
+                "bedrock:InvokeModel",
+                "bedrock:InvokeModelWithResponseStream",
+            ],
+            resources=[
+                "arn:aws:bedrock:*::foundation-model/anthropic.claude-*",
+                "arn:aws:bedrock:*:*:inference-profile/*",
+            ],
+        ))
+        
+        # S3 KB 버킷 읽기 권한
+        kb_bucket.grant_read(self.runtime.role)
+        
+        # === AgentCore Memory ===
+        self.memory = agentcore.Memory(
             self, "AgentMemory",
-            bucket_name=f"{prefix}-agent-memory-{self.account}-{self.region}",
-            encryption=s3.BucketEncryption.KMS,
-            enforce_ssl=True,
-            block_public_access=s3.BlockPublicAccess.BLOCK_ALL,
-            versioned=True,
+            memory_name=f"{prefix}_memory",
+            description="Agent 대화 컨텍스트 저장",
         )
         
-        # === AgentCore Gateway - 도구 Lambda ===
-        # 예시: Echo 도구 (템플릿)
-        self.tool_lambda = lambda_.Function(
-            self, "ToolLambda",
-            runtime=lambda_.Runtime.PYTHON_3_11,
-            handler="index.handler",
-            code=lambda_.Code.from_inline("""
-import json
-
-def handler(event, context):
-    \"\"\"MCP 호환 도구 핸들러 템플릿.
-    
-    AgentCore Gateway가 이 Lambda를 MCP 도구로 변환합니다.
-    \"\"\"
-    tool_name = event.get('tool_name', 'unknown')
-    parameters = event.get('parameters', {})
-    
-    # 도구별 처리
-    if tool_name == 'echo':
-        message = parameters.get('message', '')
-        return {
-            'statusCode': 200,
-            'body': json.dumps({'result': f'Echo: {message}'})
-        }
-    
-    return {
-        'statusCode': 400,
-        'body': json.dumps({'error': f'Unknown tool: {tool_name}'})
-    }
-"""),
-            timeout=Duration.seconds(30),
-            memory_size=256,
+        # === Outputs ===
+        CfnOutput(self, "RuntimeId",
+            value=self.runtime.agent_runtime_id,
+            description="AgentCore Runtime ID",
         )
         
-        # === AgentCore Runtime 설정 ===
-        # AgentCore Runtime은 AWS 콘솔 또는 CLI로 생성
-        # 여기서는 필요한 IAM 정책만 설정
-        
-        agent_role = iam.Role.from_role_arn(
-            self, "AgentRole", agent_role_arn
+        CfnOutput(self, "MemoryId",
+            value=self.memory.memory_id,
+            description="AgentCore Memory ID",
         )
         
-        # Memory 버킷 접근 권한
-        self.memory_bucket.grant_read_write(agent_role)
-        
-        # Tool Lambda 호출 권한
-        self.tool_lambda.grant_invoke(agent_role)
-        
-        # === AgentCore 배포 가이드 출력 ===
-        CfnOutput(self, "MemoryBucketName",
-            value=self.memory_bucket.bucket_name,
-            description="Agent Memory S3 버킷",
-        )
-        
-        CfnOutput(self, "ToolLambdaArn",
-            value=self.tool_lambda.function_arn,
-            description="도구 Lambda ARN (Gateway 연결용)",
-        )
-        
-        CfnOutput(self, "DeploymentGuide",
-            value=f"""
-AgentCore Runtime 배포 가이드:
-
-1. Agent 컨테이너 빌드 및 푸시:
-   docker build -t aiops-agent .
-   docker tag aiops-agent:latest {ecr_repo_uri}:latest
-   docker push {ecr_repo_uri}:latest
-
-2. AgentCore Runtime 생성 (CLI):
-   aws bedrock create-agent \\
-     --agent-name aiops-supervisor \\
-     --agent-resource-role-arn {agent_role_arn} \\
-     --foundation-model anthropic.claude-3-5-sonnet-20241022-v2:0
-
-3. Gateway에 도구 연결:
-   aws bedrock create-agent-action-group \\
-     --agent-id <agent-id> \\
-     --action-group-name tools \\
-     --action-group-executor lambdaArn={self.tool_lambda.function_arn}
-
-4. Memory 활성화:
-   aws bedrock update-agent \\
-     --agent-id <agent-id> \\
-     --memory-configuration enabled=true,storageDays=30
-""",
-            description="AgentCore 배포 가이드",
+        CfnOutput(self, "KBBucketForAgent",
+            value=kb_bucket.bucket_name,
+            description="Agent가 사용하는 KB S3 버킷",
         )

@@ -33,6 +33,7 @@ agentcore_stack = AgentCoreStack(
     ecr_repo_uri=infra_stack.ecr_repo.repository_uri,
     agent_role_arn=infra_stack.agent_role.role_arn,
     kms_key_arn=infra_stack.kms_key.key_arn,
+    kb_bucket=infra_stack.kb_bucket,
     stack_prefix=stack_prefix,
     description=f"{stack_prefix} 스타터 킷 - AgentCore (Runtime, Gateway, Memory)",
 )

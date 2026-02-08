@@ -90,6 +90,72 @@ aws bedrock-agent start-ingestion-job --knowledge-base-id H50SNRJBFF --data-sour
 - Solution: 새 경로를 IAM 정책 Resource에 추가
 - 관련 정책: `AmazonBedrockS3PolicyForKnowledgeBase_p2y8n`
 
+### Mickey 15: AgentCore Runtime ARM64 전용
+- Problem: x86_64 이미지로 AgentCore Runtime 생성 실패
+- Cause: AgentCore Runtime은 ARM64 아키텍처만 지원
+- Solution: Dockerfile에 `--platform=linux/arm64` 추가
+- Avoid: x86_64 이미지로 AgentCore 배포 시도
+
+### Mickey 15: KMS + CloudWatch Logs 권한
+- Problem: KMS 키로 암호화된 LogGroup 생성 실패
+- Cause: KMS 키 정책에 CloudWatch Logs 서비스 권한 없음
+- Solution: `kms_key.grant_encrypt_decrypt(iam.ServicePrincipal(f"logs.{region}.amazonaws.com"))`
+- Avoid: KMS 암호화 LogGroup 생성 시 키 정책 확인 누락
+
+### Mickey 15: IAM description ASCII 제한
+- Problem: IAM Role 생성 시 한글 description으로 실패
+- Cause: IAM은 ASCII 문자만 허용 (정규식: `[\u0009\u000A\u000D\u0020-\u007E\u00A1-\u00FF]*`)
+- Solution: description을 영어로 작성
+- Avoid: IAM Role/Policy description에 한글 사용
+
+### Mickey 16: AgentCore Runtime = HTTP 서버
+- Problem: Lambda 핸들러 방식으로 시도 → 404 에러
+- Cause: AgentCore Runtime은 Lambda가 아닌 HTTP 서버 방식 기대
+- Solution: FastAPI + uvicorn으로 HTTP 서버 구현
+- 필수 엔드포인트:
+  - `POST /invocations`: Agent 호출 (JSON 입출력)
+  - `GET /ping`: 헬스체크 (`{"status": "Healthy", "time_of_last_update": <unix_timestamp>}`)
+- 포트: 8080, 호스트: 0.0.0.0
+- Reference: https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-http-protocol-contract.html
+
+### Mickey 16: Bedrock inference-profile 권한 필요
+- Problem: Agent 호출 시 500 에러 (AccessDeniedException)
+- Cause: IAM 정책에 `foundation-model/*`만 허용, `inference-profile/*` 누락
+- Solution: IAM 정책에 inference-profile 리소스 추가
+```python
+resources=[
+    "arn:aws:bedrock:*::foundation-model/anthropic.claude-*",
+    "arn:aws:bedrock:*:*:inference-profile/*",
+]
+```
+- Avoid: foundation-model만 허용하고 inference-profile 누락
+
+### Mickey 16: AgentCore 로그 확인 명령어
+```bash
+# 최근 로그
+AWS_REGION=us-east-1 aws logs filter-log-events \
+  --log-group-name "/aws/bedrock-agentcore/runtimes/{RUNTIME_ID}-DEFAULT" \
+  --start-time $(($(date +%s) - 3600))000 --limit 30
+
+# 에러 로그만
+AWS_REGION=us-east-1 aws logs filter-log-events \
+  --log-group-name "/aws/bedrock-agentcore/runtimes/{RUNTIME_ID}-DEFAULT" \
+  --filter-pattern "ERROR" --limit 20
+```
+
+### Mickey 17: KB 검색은 단어 단위 매칭 필수
+- Problem: 전체 문자열 매칭(`query in content`)은 LLM이 생성하는 query와 매칭 실패
+- Cause: LLM은 자연어 query를 생성하지만 KB 문서에 정확한 문자열이 없음
+- Solution: 단어 단위로 분리하여 키워드 매칭 (2자 이상, 하나라도 매칭되면 포함)
+- Avoid: `query in content` 방식의 전체 문자열 매칭
+
+### Mickey 17: invoke_agent_runtime 호출 방법
+- boto3 클라이언트: `bedrock-agentcore`
+- API: `invoke_agent_runtime(agentRuntimeArn, runtimeSessionId, payload)`
+- runtimeSessionId: 최소 33자 (UUID 권장)
+- read_timeout: 300초 이상 권장
+- ARN: `arn:aws:bedrock-agentcore:{region}:{account}:runtime/{runtime_id}`
+
 ## File Locations
 - Source: src/ (예정)
 - Infrastructure: infra/ (예정)
@@ -102,4 +168,4 @@ aws bedrock-agent start-ingestion-job --knowledge-base-id H50SNRJBFF --data-sour
 ```
 
 ## Last Updated
-Mickey 10 - 2026-02-04
+Mickey 17 - 2026-02-08

@@ -38,6 +38,11 @@ chainlit.log
 .DS_Store
 Thumbs.db
 
+# Mickey session files
+MICKEY-*-SESSION.md
+MICKEY-*-HANDOFF.md
+MICKEY-*-AGENT-IMPROVEMENTS.md
+
 # Secrets
 .env
 .env.local
