@@ -2,11 +2,21 @@
 
 이 튜토리얼에서는 **코드를 직접 작성하지 않고** Agent Builder를 활용하여 Agent를 만듭니다.
 
-예상 소요 시간: 30-40분
+예상 소요 시간: 30분
 
 ---
 
-## 사전 준비: Agent Builder 설정
+## 사전 준비
+
+### 로컬 환경 실행 확인
+
+```bash
+cd templates/local
+source .venv/bin/activate
+chainlit run app.py --port 8000
+```
+
+→ 아직 안 했다면 [QUICKSTART-LOCAL.md](QUICKSTART-LOCAL.md) 먼저 진행
 
 ### Agent Builder란?
 
@@ -16,45 +26,17 @@ Kiro CLI에서 동작하는 커스텀 Agent로, 자연어 명령을 받아 Agent
 사용자: "HR Agent 만들어줘"
     ↓
 Agent Builder가 자동으로:
-1. src/tools/hr_tools.py 생성
-2. src/agent/hr_agent.py 생성
-3. supervisor_agent.py 수정
+1. agents/hr_agent.py 생성 (도구 + Agent 포함)
+2. agents/supervisor.py 수정 (연결)
 ```
 
-### Agent Builder 설정하기
+### Agent Builder 실행
 
-#### 1. 설정 파일 생성
-
-`~/.kiro/agents/agent-builder.json` 파일을 생성합니다:
-
-```json
-{
-  "name": "agent-builder",
-  "description": "자연어로 Agent를 생성/수정하는 Agent Builder",
-  "prompt": "# Agent Builder\n\n## Role\n자연어 명령으로 Agent를 생성, 수정, 개선합니다.\n\n## Capabilities\n1. **새 Agent 생성**: 도구 + Agent + Supervisor 연결\n2. **기존 Agent 수정**: 도구 추가, 시스템 프롬프트 개선\n3. **Knowledge Base 연동**: 참조 자료를 KB로 구축하여 Agent에 연결\n\n## Instructions\n\n### 필수 참조\n1. `context_rule/agent-builder-guide.md` - 생성/수정 규칙\n2. `src/agent/devops_agent.py` - Agent 구현 패턴\n3. `src/agent/supervisor_agent.py` - Supervisor 연결 패턴\n\n## Workflow\n\n### A. 새 Agent 생성\n1. 요청 분석 (이름, 도구, 담당 영역)\n2. 생성 계획 제시 → 사용자 확인\n3. 도구 파일 생성: `src/tools/{name}_tools.py`\n4. Agent 파일 생성: `src/agent/{name}_agent.py`\n5. Supervisor 연결\n6. 결과 보고 + 테스트 안내\n\n### B. 기존 Agent 수정\n1. 현재 Agent/도구 파일 분석\n2. 수정 계획 제시 → 사용자 확인\n3. 필요한 파일 수정\n4. 결과 보고 + 테스트 안내\n\n## Rules\n- 기존 Agent 패턴과 일관성 유지\n- docstring 상세히 작성 (Agent가 도구 선택 시 참조)\n- 한국어 주석/응답 기본\n- **수정 전 반드시 현재 상태 분석**\n- **수정 계획을 사용자에게 먼저 제시**",
-  "tools": ["fs_read", "fs_write", "execute_bash", "grep", "glob", "code"],
-  "resources": [
-    "file://context_rule/agent-builder-guide.md",
-    "file://src/agent/devops_agent.py",
-    "file://src/agent/supervisor_agent.py"
-  ]
-}
-```
-
-#### 2. 가이드 문서 확인
-
-프로젝트에 `context_rule/agent-builder-guide.md`가 있는지 확인합니다. 이 파일에는 Agent 생성 템플릿과 규칙이 정의되어 있습니다.
-
-#### 3. Agent Builder 실행
+프로젝트에 `templates/local/agent-builder.json`이 이미 포함되어 있습니다.
 
 ```bash
-# Kiro CLI에서 Agent Builder 사용
+# 프로젝트 루트에서
 kiro chat --agent agent-builder
-```
-
-또는 Kiro CLI 내에서:
-```
-/agent agent-builder
 ```
 
 ---
@@ -145,30 +127,28 @@ HR Agent를 만들겠습니다.
 HR Agent 생성 계획:
 
 생성할 파일:
-- src/tools/hr_tools.py (휴가 조회 도구)
-- src/agent/hr_agent.py (HR Agent)
+- templates/local/agents/hr_agent.py (도구 + Agent)
 
 수정할 파일:
-- src/agent/supervisor_agent.py (Supervisor 연결)
+- templates/local/agents/supervisor.py (Supervisor 연결)
 
 진행할까요?
-```
-
-```
-"응, 진행해줘"
 ```
 
 ---
 
 ## Step 3: 생성된 코드 확인 (5분)
 
-Agent Builder가 생성한 파일들:
+Agent Builder가 생성한 파일을 확인합니다.
 
-### 도구 파일 (`src/tools/hr_tools.py`)
+### Agent 파일 (`templates/local/agents/hr_agent.py`)
+
+도구와 Agent가 하나의 파일에 정의됩니다 (guide_agent.py와 동일한 패턴):
 
 ```python
-"""HR Tools - 인사 관련 도구."""
-from strands import tool
+"""HR Agent - 인사 업무 전문가."""
+from strands import Agent, tool
+from strands.models import BedrockModel
 
 # 테스트용 데이터
 LEAVE_DATA = {
@@ -176,6 +156,7 @@ LEAVE_DATA = {
     "E002": {"name": "김철수", "remaining": 8},
     "E003": {"name": "이영희", "remaining": 15},
 }
+
 
 @tool
 def get_leave_balance(employee_id: str) -> str:
@@ -191,26 +172,19 @@ def get_leave_balance(employee_id: str) -> str:
         data = LEAVE_DATA[employee_id]
         return f"{data['name']}님의 휴가 잔여일은 {data['remaining']}일입니다."
     return f"직원 ID '{employee_id}'를 찾을 수 없습니다."
-```
 
-### Agent 파일 (`src/agent/hr_agent.py`)
-
-```python
-"""HR Agent - 인사 업무 전문가."""
-from strands import Agent
-from strands.models import BedrockModel
-from src.tools.hr_tools import get_leave_balance
 
 SYSTEM_PROMPT = """당신은 HR 업무를 담당하는 AI 에이전트입니다.
 
 주요 역할:
-1. 휴가 잔여일 조회
+1. 휴가 잔여일 조회 - get_leave_balance 도구 사용
 
 응답 원칙:
 - 한국어로 응답
 - 직원 ID가 없으면 요청
 - 친절하고 명확하게 안내
 """
+
 
 def create_hr_agent() -> Agent:
     model = BedrockModel(
@@ -224,6 +198,37 @@ def create_hr_agent() -> Agent:
     )
 ```
 
+### Supervisor 연결 (`templates/local/agents/supervisor.py`)
+
+Agent Builder가 supervisor.py에 다음을 추가합니다:
+
+```python
+# 추가된 부분
+_hr_agent = None
+
+def _get_hr_agent():
+    global _hr_agent
+    if _hr_agent is None:
+        from hr_agent import create_hr_agent
+        _hr_agent = create_hr_agent()
+    return _hr_agent
+
+@tool
+def ask_hr_agent(query: str) -> str:
+    """HR 관련 질문을 HR Agent에게 전달합니다.
+    
+    휴가 잔여일, 직원 정보 등 인사 관련 질문에 사용합니다.
+    
+    Args:
+        query: HR 관련 질문
+    """
+    agent = _get_hr_agent()
+    return str(agent(query))
+
+# tools 배열에 ask_hr_agent 추가
+# SYSTEM_PROMPT에 HR Agent 설명 추가
+```
+
 ---
 
 ## Step 4: 테스트 (5분)
@@ -231,20 +236,20 @@ def create_hr_agent() -> Agent:
 ### 실행
 
 ```bash
+cd templates/local
 chainlit run app.py --port 8000
 ```
 
 ### 테스트 질문
 
 ```
-"HR Agent에게 E001 직원의 휴가 잔여일 물어봐줘"
+"E001 직원의 휴가 잔여일 알려줘"
 ```
 
 ### 예상 응답
 
 ```
 HR Agent에게 확인했습니다.
-
 홍길동님의 휴가 잔여일은 12일입니다.
 ```
 
@@ -260,7 +265,7 @@ Agent Builder를 다시 실행하여 기능을 확장합니다.
 "HR Agent에 직원 목록 조회 기능도 추가해줘"
 ```
 
-Agent Builder가 `hr_tools.py`에 새 도구를 추가합니다:
+Agent Builder가 `hr_agent.py`에 새 도구를 추가합니다:
 
 ```python
 @tool
@@ -319,6 +324,17 @@ def get_leave_balance(employee_id: str) -> str:
 
 ## 핵심 포인트
 
+### 파일 구조 패턴
+
+```
+templates/local/agents/
+├── supervisor.py      # Supervisor (Agent 조율)
+├── guide_agent.py     # 프로젝트 가이드 (기본 제공)
+└── hr_agent.py        # ← Agent Builder가 생성
+```
+
+하나의 Agent 파일에 **도구 + Agent**가 함께 정의됩니다.
+
 ### 자연어로 할 수 있는 것
 
 | 작업 | 예시 요청 |
@@ -333,7 +349,6 @@ def get_leave_balance(employee_id: str) -> str:
 
 | 작업 | 이유 |
 |------|------|
-| app.py 수정 | UI 레이어는 수동 연결 필요 |
 | 환경 변수 설정 | 보안상 자동화 불가 |
 | AWS 리소스 생성 | 권한/비용 문제 |
 
@@ -359,7 +374,7 @@ def get_leave_balance(employee_id: str) -> str:
 ### 3. 기존 패턴 참조 요청
 
 ```
-"devops_agent.py 패턴을 참고해서 만들어줘"
+"guide_agent.py 패턴을 참고해서 만들어줘"
 ```
 
 ### 4. 테스트 후 개선 요청

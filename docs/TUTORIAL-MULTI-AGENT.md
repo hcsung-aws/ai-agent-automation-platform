@@ -17,7 +17,7 @@
     ┌─────────────┼─────────────┐
     ↓             ↓             ↓
 ┌───────┐   ┌───────┐   ┌───────┐
-│  HR   │   │DevOps │   │  ...  │
+│ Guide │   │  HR   │   │  ...  │
 │ Agent │   │ Agent │   │ Agent │
 └───────┘   └───────┘   └───────┘
 ```
@@ -33,6 +33,43 @@
 
 ---
 
+## 현재 구조 확인
+
+`templates/local/agents/` 에는 이미 Supervisor + Guide Agent가 구성되어 있습니다:
+
+```
+templates/local/agents/
+├── supervisor.py      # Supervisor (Agent 조율)
+├── guide_agent.py     # 프로젝트 가이드 (기본 제공)
+└── hr_agent.py        # ← TUTORIAL-FIRST-AGENT에서 생성했다면
+```
+
+`supervisor.py`의 핵심 패턴:
+
+```python
+# 1. 지연 초기화
+_guide_agent = None
+
+def _get_guide_agent():
+    global _guide_agent
+    if _guide_agent is None:
+        from guide_agent import create_guide_agent
+        _guide_agent = create_guide_agent()
+    return _guide_agent
+
+# 2. Agent-as-Tool 패턴
+@tool
+def ask_guide_agent(query: str) -> str:
+    """프로젝트 가이드 Agent에게 질문합니다."""
+    agent = _get_guide_agent()
+    return str(agent(query))
+
+# 3. tools 배열에 등록
+tools=[ask_guide_agent]
+```
+
+---
+
 ## Step 1: 두 번째 Agent 생성 (10분)
 
 HR Agent가 있다고 가정하고, DevOps Agent를 추가합니다.
@@ -44,16 +81,16 @@ kiro chat --agent agent-builder
 ```
 
 ```
-"DevOps Agent를 만들어줘. CloudWatch 알람 조회, EC2 상태 확인 기능이 필요해."
+"DevOps Agent를 만들어줘. CloudWatch 알람 조회, EC2 상태 확인 기능이 필요해.
+테스트용 하드코딩 데이터로 시작하고 싶어."
 ```
 
 ### 생성 결과
 
 ```
 생성 완료:
-- src/tools/devops_tools.py
-- src/agent/devops_agent.py
-- src/agent/supervisor_agent.py (수정됨)
+- templates/local/agents/devops_agent.py (도구 + Agent)
+- templates/local/agents/supervisor.py (수정됨)
 ```
 
 ---
@@ -62,40 +99,56 @@ kiro chat --agent agent-builder
 
 Agent Builder가 자동으로 Supervisor를 수정하지만, 확인이 필요합니다.
 
-### supervisor_agent.py 확인 사항
+### supervisor.py 확인 사항
 
 ```python
-# 1. Import 추가됨
-from src.agent.hr_agent import create_hr_agent
-from src.agent.devops_agent import create_devops_agent
+# 1. 지연 초기화 추가됨
+_devops_agent = None
 
-# 2. 위임 도구 추가됨
-@tool
-def ask_hr_agent(query: str) -> str:
-    """HR 관련 질문을 HR Agent에게 전달합니다."""
-    ...
+def _get_devops_agent():
+    global _devops_agent
+    if _devops_agent is None:
+        from devops_agent import create_devops_agent
+        _devops_agent = create_devops_agent()
+    return _devops_agent
 
+# 2. Agent-as-Tool 추가됨
 @tool
 def ask_devops_agent(query: str) -> str:
-    """DevOps 관련 질문을 DevOps Agent에게 전달합니다."""
-    ...
+    """DevOps 관련 질문을 DevOps Agent에게 전달합니다.
+    
+    CloudWatch 알람, EC2 상태 등 인프라 관련 질문에 사용합니다.
+    """
+    agent = _get_devops_agent()
+    return str(agent(query))
 
 # 3. tools 배열에 추가됨
-tools=[ask_hr_agent, ask_devops_agent]
+tools=[ask_guide_agent, ask_hr_agent, ask_devops_agent]
 
 # 4. SYSTEM_PROMPT에 설명 추가됨
 """
-### HR Agent (ask_hr_agent)
-담당: 휴가 조회, 직원 정보
-
 ### DevOps Agent (ask_devops_agent)
 담당: CloudWatch 알람, EC2 상태
 """
 ```
 
+### 체크리스트
+
+- [ ] `_get_devops_agent()` 지연 초기화 함수 있는가?
+- [ ] `ask_devops_agent` 도구 함수 있는가?
+- [ ] `tools` 배열에 추가되었는가?
+- [ ] `SYSTEM_PROMPT`에 Agent 설명이 있는가?
+
 ---
 
 ## Step 3: 테스트 (10분)
+
+### 실행
+
+```bash
+cd templates/local
+chainlit run app.py --port 8000
+```
 
 ### 단일 Agent 질문
 
@@ -149,14 +202,14 @@ Agent Builder에게 요청:
 
 ## Multi-Agent 확장 패턴
 
-### 패턴 1: 영역별 분리
+### 패턴 1: 영역별 분리 (권장)
 
 ```
 Supervisor
+├── Guide Agent (프로젝트 안내)
 ├── HR Agent (인사)
 ├── DevOps Agent (인프라)
-├── Analytics Agent (데이터)
-└── Finance Agent (재무)
+└── Analytics Agent (데이터)
 ```
 
 ### 패턴 2: 기능별 분리
@@ -187,7 +240,7 @@ Supervisor
 ### 1. Agent 수 제한
 
 - 권장: 3-5개
-- 너무 많으면 Supervisor가 혼란
+- 너무 많으면 Supervisor가 위임 대상을 혼동
 
 ### 2. 영역 중복 방지
 
@@ -205,6 +258,10 @@ Supervisor
 ❌ "적절한 Agent에게 위임"
 ✅ "휴가/급여 키워드 → HR Agent"
 ```
+
+### 4. 도구 설명(docstring) 상세 작성
+
+Supervisor는 `@tool` 함수의 docstring을 보고 위임을 결정합니다. 담당 영역과 키워드를 명확히 작성하세요.
 
 ---
 
