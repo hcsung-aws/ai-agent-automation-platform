@@ -143,6 +143,13 @@ AWS_REGION=us-east-1 aws logs filter-log-events \
   --filter-pattern "ERROR" --limit 20
 ```
 
+### Mickey 19: Chainlit 2.9.6 피드백 API
+- `@cl.on_feedback` 콜백 등록만으로 👍/👎 버튼 자동 표시
+- config.toml에 `human_feedback` 키 없음 (존재하지 않는 설정)
+- Feedback 타입: `cl.types.Feedback` (`cl.Feedback`는 KeyError)
+- 필드: `forId`(메시지 참조), `value`(0=negative, 1=positive), `comment`, `id`(피드백 자체 ID)
+- Avoid: `cl.Feedback` 직접 참조, config.toml에 human_feedback 설정
+
 ### Mickey 17: KB 검색은 단어 단위 매칭 필수
 - Problem: 전체 문자열 매칭(`query in content`)은 LLM이 생성하는 query와 매칭 실패
 - Cause: LLM은 자연어 query를 생성하지만 KB 문서에 정확한 문자열이 없음
@@ -167,5 +174,15 @@ AWS_REGION=us-east-1 aws logs filter-log-events \
 # (구현 후 추가 예정)
 ```
 
+### Mickey 20: 피드백과 사례는 보완 관계
+- 피드백: "뭘 고칠지" 신호 (👍/👎) → 스케줄러가 분석하여 개선 방향 도출
+- 사례: "어떻게 해결했는지" 지식 → KB에 축적하여 RAG로 직접 재활용
+- 둘 다 필요하며 역할이 다름
+
+### Mickey 20: 자동 저장 시 후속 처리 경로 필수
+- Problem: drafts/에 자동 저장만 하고 후속 처리(검토/승격) 없으면 dead-end
+- Solution: 스케줄러 없이 운영 시 저장 시점에 사용자 확인 거쳐야 함
+- Pattern: 👍 → LLM 요약 → 미리보기 → ✅저장/❌취소
+
 ## Last Updated
-Mickey 17 - 2026-02-08
+Mickey 20 - 2026-02-11

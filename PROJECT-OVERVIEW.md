@@ -46,13 +46,14 @@ AIOps 스타터 킷 - AI Agent 기반 운영 자동화 플랫폼
 - [x] QUICKSTART 문서 (로컬/AWS)
 
 ## Current Status
-- Session: Mickey 18
-- Progress: v1.3 완료, 스타터 킷 패키징 완료
+- Session: Mickey 20
+- Progress: v1.3 완료, 사례 기반 학습(Case-based Learning) 구현 완료
 - AWS 배포: ✅ E2E 검증 완료 (us-east-1)
 - 로컬 환경: ✅ 동작 확인
-- 테스트: ✅ 15/15 통과
+- 테스트: ✅ 15/15 통과 (변경 후 재확인 필요)
 - 문서: ✅ QUICKSTART x2, TUTORIAL x3, BEST-PRACTICES, TROUBLESHOOTING
-- Next: 튜토리얼 문서를 templates/local 기준으로 재작성
+- 사례 학습: ✅ save_case 도구 + 피드백 기반 사례 제안 (로컬)
+- Next: v2.0 스케줄러 구현, Slack/이메일 알림 연동
 
 ## Last Updated
-Mickey 18 - 2026-02-09
+Mickey 20 - 2026-02-11

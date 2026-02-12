@@ -5,6 +5,7 @@ Agent Builder가 새 Agent를 추가하면 이 파일에 연결됩니다.
 """
 from strands import Agent, tool
 from strands.models import BedrockModel
+from case_tools import save_case
 
 # Sub-agents (lazy initialization)
 _guide_agent = None
@@ -60,6 +61,12 @@ SYSTEM_PROMPT = """당신은 AI Agent 팀의 Supervisor입니다.
 - 로컬/AWS 배포 가이드
 - 트러블슈팅 지원
 
+### 사례 저장 (save_case)
+사용자가 '사례로 저장해줘', '이 대화 기록해줘' 등 요청 시:
+- 현재 대화의 문제-해결 과정을 요약
+- title, problem, resolution, tags를 추출하여 save_case 호출
+- KB에 축적되어 향후 유사 문제 시 참조됨
+
 ## 새 Agent 추가 방법
 1. Agent Builder로 새 Agent 생성
 2. 이 파일에 ask_xxx_agent 도구 추가
@@ -89,6 +96,7 @@ def create_supervisor() -> Agent:
         system_prompt=SYSTEM_PROMPT,
         tools=[
             ask_guide_agent,
+            save_case,
             # 새 Agent 도구 추가 위치
         ],
     )
