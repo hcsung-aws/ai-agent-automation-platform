@@ -2,6 +2,7 @@
 from strands import Agent
 from strands.models import BedrockModel
 
+from src.config import MODEL_ID, REGION_NAME
 from src.tools.cloudwatch_tools import get_cloudwatch_metrics
 from src.tools.ec2_tools import get_ec2_status
 from src.tools.cloudformation_tools import get_stack_events, list_stacks
@@ -36,8 +37,8 @@ SYSTEM_PROMPT = """당신은 DevOps 전문가 AI 에이전트입니다.
 def create_devops_agent() -> Agent:
     """Create and return DevOps Agent instance."""
     model = BedrockModel(
-        model_id="us.anthropic.claude-3-5-sonnet-20241022-v2:0",
-        region_name="us-east-1",
+        model_id=MODEL_ID,
+        region_name=REGION_NAME,
     )
     
     agent = Agent(

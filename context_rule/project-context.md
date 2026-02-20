@@ -163,6 +163,23 @@ AWS_REGION=us-east-1 aws logs filter-log-events \
 - read_timeout: 300초 이상 권장
 - ARN: `arn:aws:bedrock-agentcore:{region}:{account}:runtime/{runtime_id}`
 
+### Mickey 19: Chainlit 피드백 버튼은 Data Layer 필수
+- Problem: @cl.on_feedback 등록해도 👍/👎 버튼이 안 보임
+- Cause: server.py PUT /feedback에서 get_data_layer() 체크 → None이면 프론트엔드가 버튼 미렌더링
+- Solution: cl.Action 버튼으로 자체 구현 (PoC 패턴: feedback_positive/feedback_negative 액션)
+- Avoid: Data Layer 없이 @cl.on_feedback 사용
+
+### Mickey 19: Chainlit HTML 렌더링 불가
+- config.toml `unsafe_allow_html = false`가 기본값
+- `<details>`, `<summary>` 등 HTML 태그는 텍스트로 출력됨
+- cl.Text(display="side")는 가시성 낮음 → 중요 내용은 인라인 마크다운으로
+- Avoid: HTML 태그 사용, cl.Text 사이드 패널에 핵심 내용 숨기기
+
+### Mickey 19: Strands Agent.hooks 외부 접근
+- Agent 생성 후 `agent.hooks.add_hook(provider)`로 외부에서 hook 추가 가능
+- supervisor.py 수정 없이 app.py에서 ToolCallTracker로 추론 과정 캡처
+- Pattern: HookProvider 구현 → BeforeToolCallEvent/AfterToolCallEvent 콜백
+
 ## File Locations
 - Source: src/ (예정)
 - Infrastructure: infra/ (예정)
@@ -174,6 +191,11 @@ AWS_REGION=us-east-1 aws logs filter-log-events \
 # (구현 후 추가 예정)
 ```
 
+### Mickey 14: KB 검색 로직 중복 방지
+- Problem: kb_tools.py(전체 문자열 매칭)와 guide_agent.py(단어 매칭)에서 같은 폴백 체인을 각각 구현, 검색 품질 차이 발생
+- Solution: 단어 매칭으로 통일
+- Rule: 같은 검색 로직을 여러 파일에 구현하지 말 것. 새 검색 로직 추가 시 기존 구현과 통일 확인 필수
+
 ### Mickey 20: 피드백과 사례는 보완 관계
 - 피드백: "뭘 고칠지" 신호 (👍/👎) → 스케줄러가 분석하여 개선 방향 도출
 - 사례: "어떻게 해결했는지" 지식 → KB에 축적하여 RAG로 직접 재활용
@@ -184,5 +206,17 @@ AWS_REGION=us-east-1 aws logs filter-log-events \
 - Solution: 스케줄러 없이 운영 시 저장 시점에 사용자 확인 거쳐야 함
 - Pattern: 👍 → LLM 요약 → 미리보기 → ✅저장/❌취소
 
+### Mickey 15: config.py 위치와 테스트 sys.path
+- Problem: `templates/local/agents/config.py`에 두니 테스트에서 `ModuleNotFoundError`
+- Cause: 테스트가 `templates/local/`을 sys.path에 추가하므로 `from config import ...`는 `templates/local/config.py`를 찾음
+- Solution: config.py를 `templates/local/`에 배치 (테스트 sys.path와 일치)
+- Rule: 공유 config는 테스트의 sys.path 루트에 배치할 것
+
+### Mickey 15: 하드코딩 환경변수 매핑
+- `BEDROCK_MODEL_ID`: 모델 ID (기본값: us.anthropic.claude-3-5-sonnet-20241022-v2:0)
+- `BEDROCK_REGION`: AWS region (기본값: us-east-1)
+- `MONITORING_TEST_MODE`: monitoring agent 테스트 모드 (기본값: true, false로 해제)
+- `CDK_DEFAULT_REGION`: CDK 배포 region
+
 ## Last Updated
-Mickey 20 - 2026-02-11
+Mickey 19 - 2026-02-20

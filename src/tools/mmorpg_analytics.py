@@ -2,6 +2,7 @@
 import boto3
 import time
 from strands import tool
+from src.config import REGION_NAME
 
 ATHENA_DATABASE = "game_logs"
 ATHENA_OUTPUT = "s3://devops-agent-kb-965037532757/athena-results/"
@@ -9,7 +10,7 @@ ATHENA_OUTPUT = "s3://devops-agent-kb-965037532757/athena-results/"
 
 def _run_query(query: str) -> str:
     """Execute Athena query and return results."""
-    client = boto3.client("athena", region_name="us-east-1")
+    client = boto3.client("athena", region_name=REGION_NAME)
     
     response = client.start_query_execution(
         QueryString=query,

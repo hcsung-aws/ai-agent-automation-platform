@@ -6,6 +6,7 @@ Agent Builder가 새 Agent를 추가하면 이 파일에 연결됩니다.
 from strands import Agent, tool
 from strands.models import BedrockModel
 from case_tools import save_case
+from config import MODEL_ID, REGION_NAME
 
 # Sub-agents (lazy initialization)
 _guide_agent = None
@@ -87,8 +88,8 @@ SYSTEM_PROMPT = """당신은 AI Agent 팀의 Supervisor입니다.
 def create_supervisor() -> Agent:
     """Supervisor Agent 인스턴스를 생성합니다."""
     model = BedrockModel(
-        model_id="us.anthropic.claude-3-5-sonnet-20241022-v2:0",
-        region_name="us-east-1",
+        model_id=MODEL_ID,
+        region_name=REGION_NAME,
     )
     
     return Agent(

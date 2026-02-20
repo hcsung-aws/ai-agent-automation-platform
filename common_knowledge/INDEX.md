@@ -6,7 +6,7 @@
 
 | 트리거 | 파일 | 요약 |
 |--------|------|------|
-| (현재 등록된 지식 파일 없음) | - | - |
+| MCP, MCPClient, MCP 서버, Model Context Protocol, mcp_agent | strands-mcp-pattern.md | Strands SDK MCP 연동 패턴 (Managed/Manual, Transport, 혼합 사용) |
 
 ## 등록 대상 기준
 
@@ -28,4 +28,4 @@
 3. 트리거 키워드는 구체적으로 작성 (너무 넓으면 불필요한 로딩 발생)
 
 ## Last Updated
-Mickey 18 - 2026-02-09
+Mickey 17 - 2026-02-19

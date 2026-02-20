@@ -3,6 +3,7 @@ import time
 from strands import Agent, tool
 from strands.models import BedrockModel
 
+from src.config import MODEL_ID, REGION_NAME
 from src.agent.devops_agent import create_devops_agent
 from src.agent.analytics_agent import create_analytics_agent
 from src.agent.godot_review_agent import create_godot_review_agent
@@ -206,8 +207,8 @@ SYSTEM_PROMPT = """당신은 게임 운영 총괄 AI 에이전트(Supervisor)입
 def create_supervisor_agent() -> Agent:
     """Create and return Supervisor Agent instance."""
     model = BedrockModel(
-        model_id="us.anthropic.claude-3-5-sonnet-20241022-v2:0",
-        region_name="us-east-1",
+        model_id=MODEL_ID,
+        region_name=REGION_NAME,
     )
     
     agent = Agent(

@@ -2,6 +2,7 @@
 from strands import Agent
 from strands.models import BedrockModel
 
+from src.config import MODEL_ID, REGION_NAME
 from src.tools.athena_tools import run_athena_query, list_athena_tables, get_table_schema
 from src.tools.quicksight_tools import list_quicksight_dashboards, list_quicksight_datasets, get_dataset_refresh_status
 from src.tools.kb_tools import search_analytics_knowledge
@@ -70,8 +71,8 @@ SYSTEM_PROMPT = """당신은 MMORPG 게임 데이터 분석 전문가 AI 에이�
 def create_analytics_agent() -> Agent:
     """Create and return Data Analytics Agent instance."""
     model = BedrockModel(
-        model_id="us.anthropic.claude-3-5-sonnet-20241022-v2:0",
-        region_name="us-east-1",
+        model_id=MODEL_ID,
+        region_name=REGION_NAME,
     )
     
     agent = Agent(

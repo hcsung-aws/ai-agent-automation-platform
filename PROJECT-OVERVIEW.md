@@ -46,14 +46,45 @@ AIOps 스타터 킷 - AI Agent 기반 운영 자동화 플랫폼
 - [x] QUICKSTART 문서 (로컬/AWS)
 
 ## Current Status
-- Session: Mickey 20
-- Progress: v1.3 완료, 사례 기반 학습(Case-based Learning) 구현 완료
+- Session: Mickey 19
+- Progress: v1.5 완료, Template app.py 개선 완료 (추론 과정 + 피드백 버튼)
 - AWS 배포: ✅ E2E 검증 완료 (us-east-1)
 - 로컬 환경: ✅ 동작 확인
-- 테스트: ✅ 15/15 통과 (변경 후 재확인 필요)
+- 테스트: ✅ 15/15 통과
 - 문서: ✅ QUICKSTART x2, TUTORIAL x3, BEST-PRACTICES, TROUBLESHOOTING
 - 사례 학습: ✅ save_case 도구 + 피드백 기반 사례 제안 (로컬)
-- Next: v2.0 스케줄러 구현, Slack/이메일 알림 연동
+- 리팩토링: ✅ 모델 ID 10곳 + region 20곳 → config/환경변수 추출 완료
+
+## Roadmap
+
+```
+v1.3 자동 개선              ████████████ 100% ✅
+스타터 킷 패키징            ████████████ 100% ✅
+AWS 배포 E2E                ████████████ 100% ✅
+코드 리팩토링               ████████████ 100% ✅
+v1.4 Kiro CLI Agent 체계화  ████████████ 100% ✅
+v1.5 MCP 연동 지원          ████████████ 100% ✅
+v1.6 KB 자동 Sync           ░░░░░░░░░░░░   0%
+v2.0 스케줄러/알림           ░░░░░░░░░░░░   0%
+```
+
+### v1.4 - Kiro CLI Agent 체계화 (1-2일)
+- deployment-agent + review-agent 생성
+- agent-builder 개선 (delegate 패턴: 배포 요청 시 review → deployment)
+- Kiro CLI use_subagent로 Agent 간 위임
+
+### v1.5 - MCP 연동 지원 (2-3일)
+- 기존 Python 도구 유지 + MCP 연동 패턴 추가
+- AgentCore Gateway MCP 예시, TUTORIAL-MCP-AGENT.md
+- Agent Builder가 MCP 연동 Agent도 생성 가능하게
+
+### v1.6 - KB 자동 Sync 파이프라인 (2-3일)
+- S3 PUT → SQS → Lambda → Bedrock KB Sync 자동화
+- CDK 스택에 리소스 추가
+
+### v2.0 - 스케줄러/알림
+- EventBridge + Lambda 스케줄러
+- Slack/이메일 알림 연동
 
 ## Last Updated
-Mickey 20 - 2026-02-11
+Mickey 19 - 2026-02-20

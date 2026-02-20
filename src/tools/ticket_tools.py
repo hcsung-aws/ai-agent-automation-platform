@@ -3,8 +3,9 @@ import boto3
 import uuid
 from datetime import datetime
 from strands import tool
+from src.config import REGION_NAME
 
-dynamodb = boto3.resource("dynamodb", region_name="us-east-1")
+dynamodb = boto3.resource("dynamodb", region_name=REGION_NAME)
 table = dynamodb.Table("incident-tickets")
 
 

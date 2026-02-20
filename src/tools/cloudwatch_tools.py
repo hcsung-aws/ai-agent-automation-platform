@@ -2,9 +2,10 @@
 import boto3
 from datetime import datetime, timedelta
 from strands import tool
+from src.config import REGION_NAME
 
-cloudwatch = boto3.client("cloudwatch", region_name="us-east-1")
-ec2 = boto3.client("ec2", region_name="us-east-1")
+cloudwatch = boto3.client("cloudwatch", region_name=REGION_NAME)
+ec2 = boto3.client("ec2", region_name=REGION_NAME)
 
 
 @tool

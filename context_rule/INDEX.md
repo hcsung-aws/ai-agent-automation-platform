@@ -9,6 +9,7 @@
 | 세션 시작 (T2 자동 로딩) | project-context.md | 환경, 목표, 제약, 주요 결정, Known Issues, 누적 교훈 |
 | KB 설계, 검색 로직, 폴백 체인, 환경변수 설정 | kb-design-guide.md | KB 3단계 폴백 (Bedrock→S3→로컬), 환경별 설정, 점진적 전환 경로 |
 | Agent 생성, Agent 수정, Supervisor 연결, KB 연동 | agent-builder-guide.md | Agent/도구 템플릿, Supervisor 연결 체크리스트, KB 연동 패턴 |
+| Kiro CLI Agent, Agent JSON, ~/.kiro/agents, ListAgents, delegate, InvokeSubagents | kiro-cli-agent-guide.md | Kiro CLI Agent JSON 규칙, 등록 방법, delegate 워크플로 |
 
 ## 사용 규칙
 
@@ -17,4 +18,4 @@
 3. 새 규칙 파일 추가 시 이 INDEX에 반드시 등록
 
 ## Last Updated
-Mickey 18 - 2026-02-09
+Mickey 17 - 2026-02-19

@@ -1,6 +1,7 @@
 """QuickSight tools for Data Analytics Agent."""
 import boto3
 from strands import tool
+from src.config import REGION_NAME
 
 ACCOUNT_ID = "965037532757"
 
@@ -12,7 +13,7 @@ def list_quicksight_dashboards() -> str:
     Returns:
         대시보드 목록 (이름, ID, 상태)
     """
-    client = boto3.client("quicksight", region_name="us-east-1")
+    client = boto3.client("quicksight", region_name=REGION_NAME)
     
     try:
         response = client.list_dashboards(AwsAccountId=ACCOUNT_ID)
@@ -42,7 +43,7 @@ def list_quicksight_datasets() -> str:
     Returns:
         데이터셋 목록 (이름, ID, 타입)
     """
-    client = boto3.client("quicksight", region_name="us-east-1")
+    client = boto3.client("quicksight", region_name=REGION_NAME)
     
     try:
         response = client.list_data_sets(AwsAccountId=ACCOUNT_ID)
@@ -75,7 +76,7 @@ def get_dataset_refresh_status(dataset_id: str) -> str:
     Returns:
         최근 새로고침 상태
     """
-    client = boto3.client("quicksight", region_name="us-east-1")
+    client = boto3.client("quicksight", region_name=REGION_NAME)
     
     try:
         response = client.list_ingestions(

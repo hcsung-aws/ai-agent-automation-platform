@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 import boto3
 from strands import tool
+from src.config import REGION_NAME
 
 # 환경변수에서 설정 로드
 KNOWLEDGE_BASE_ID = os.environ.get("KNOWLEDGE_BASE_ID", "")
@@ -20,7 +21,7 @@ _agent_client = None
 def _get_client():
     global _client
     if _client is None:
-        _client = boto3.client("bedrock-agent-runtime", region_name="us-east-1")
+        _client = boto3.client("bedrock-agent-runtime", region_name=REGION_NAME)
     return _client
 
 
@@ -34,7 +35,7 @@ def _search_local(query: str, category: str = None) -> str:
     categories.append("common")  # 공통은 항상 포함
     
     results = []
-    query_lower = query.lower()
+    keywords = [w for w in query.lower().split() if len(w) >= 2]
     
     for cat in categories:
         cat_path = LOCAL_KB_PATH / cat
@@ -42,17 +43,20 @@ def _search_local(query: str, category: str = None) -> str:
             continue
         for md_file in cat_path.glob("*.md"):
             content = md_file.read_text(encoding="utf-8")
-            if query_lower in content.lower():
+            content_lower = content.lower()
+            matched = sum(1 for kw in keywords if kw in content_lower)
+            if matched > 0:
                 snippet = content[:2000] + "..." if len(content) > 2000 else content
-                results.append(f"[{cat}/{md_file.name}]\n{snippet}")
+                results.append((matched, f"[{cat}/{md_file.name}]\n{snippet}"))
     
-    return "\n\n---\n\n".join(results) if results else "관련 문서를 찾지 못했습니다."
+    results.sort(key=lambda x: x[0], reverse=True)
+    return "\n\n---\n\n".join(r[1] for r in results) if results else "관련 문서를 찾지 못했습니다."
 
 
 def _get_s3_client():
     global _s3_client
     if _s3_client is None:
-        _s3_client = boto3.client("s3", region_name="us-east-1")
+        _s3_client = boto3.client("s3", region_name=REGION_NAME)
     return _s3_client
 
 
@@ -69,7 +73,7 @@ def _search_s3(query: str, category: str = None) -> str:
         categories.append("common")
         
         results = []
-        query_lower = query.lower()
+        keywords = [w for w in query.lower().split() if len(w) >= 2]
         
         for cat in categories:
             prefix = f"{S3_PREFIX}/{cat}/"
@@ -80,16 +84,18 @@ def _search_s3(query: str, category: str = None) -> str:
                 if not key.endswith(".md"):
                     continue
                 
-                # 파일 내용 가져오기
                 file_obj = s3.get_object(Bucket=S3_BUCKET, Key=key)
                 content = file_obj["Body"].read().decode("utf-8")
+                content_lower = content.lower()
                 
-                if query_lower in content.lower():
+                matched = sum(1 for kw in keywords if kw in content_lower)
+                if matched > 0:
                     snippet = content[:2000] + "..." if len(content) > 2000 else content
                     filename = key.split("/")[-1]
-                    results.append(f"[{cat}/{filename}]\n{snippet}")
+                    results.append((matched, f"[{cat}/{filename}]\n{snippet}"))
         
-        return "\n\n---\n\n".join(results) if results else ""
+        results.sort(key=lambda x: x[0], reverse=True)
+        return "\n\n---\n\n".join(r[1] for r in results) if results else ""
     except Exception as e:
         print(f"⚠️ S3 검색 실패: {e}")
         return ""
@@ -98,7 +104,7 @@ def _search_s3(query: str, category: str = None) -> str:
 def _get_agent_client():
     global _agent_client
     if _agent_client is None:
-        _agent_client = boto3.client("bedrock-agent", region_name="us-east-1")
+        _agent_client = boto3.client("bedrock-agent", region_name=REGION_NAME)
     return _agent_client
 
 

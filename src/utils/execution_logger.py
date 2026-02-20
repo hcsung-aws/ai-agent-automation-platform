@@ -1,10 +1,11 @@
 """Execution logging for agent interactions."""
 import boto3
+import os
 import uuid
 from datetime import datetime
 from typing import Optional
 
-REGION = "us-east-1"
+REGION = os.environ.get("BEDROCK_REGION", "us-east-1")
 TABLE_NAME = "execution-logs"
 FEEDBACK_TABLE_NAME = "agent-feedback"
 

@@ -1,8 +1,9 @@
 """EC2 status tool for DevOps Agent."""
 import boto3
 from strands import tool
+from src.config import REGION_NAME
 
-ec2 = boto3.client("ec2", region_name="us-east-1")
+ec2 = boto3.client("ec2", region_name=REGION_NAME)
 
 
 @tool

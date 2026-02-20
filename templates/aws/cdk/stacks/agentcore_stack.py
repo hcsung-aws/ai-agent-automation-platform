@@ -71,8 +71,8 @@ class AgentCoreStack(Stack):
             ],
         ))
         
-        # S3 KB 버킷 읽기 권한
-        kb_bucket.grant_read(self.runtime.role)
+        # S3 KB 버킷 읽기/쓰기 권한 (사례 저장 포함)
+        kb_bucket.grant_read_write(self.runtime.role)
         
         # === AgentCore Memory ===
         self.memory = agentcore.Memory(

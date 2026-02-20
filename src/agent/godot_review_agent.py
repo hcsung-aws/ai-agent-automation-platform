@@ -2,6 +2,7 @@
 from strands import Agent
 from strands.models import BedrockModel
 
+from src.config import MODEL_ID, REGION_NAME
 from src.tools.godot_review_tools import (
     read_gdscript_file,
     analyze_gdscript_structure,
@@ -90,8 +91,8 @@ KB에는 Godot 엔진 기초, 프로젝트 컨벤션, 코드 예시가 포함되
 def create_godot_review_agent() -> Agent:
     """Create and return Godot Review Agent instance."""
     model = BedrockModel(
-        model_id="us.anthropic.claude-3-5-sonnet-20241022-v2:0",
-        region_name="us-east-1",
+        model_id=MODEL_ID,
+        region_name=REGION_NAME,
     )
     
     return Agent(

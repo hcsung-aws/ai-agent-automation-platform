@@ -1,10 +1,11 @@
 """Setup MMORPG analytics tables in Glue based on mockdb schema."""
 import boto3
 import json
+import os
 from datetime import datetime, timedelta
 import random
 
-REGION = "us-east-1"
+REGION = os.environ.get("BEDROCK_REGION", "us-east-1")
 DATABASE = "game_logs"
 S3_BUCKET = "devops-agent-kb-965037532757"
 S3_PREFIX = "mmorpg-data"

@@ -70,16 +70,22 @@ kiro chat --agent agent-builder
 │  │ Chainlit  │───▶│ Supervisor Agent                │    │
 │  │ UI        │    │   ├── Guide Agent              │    │
 │  │ (app.py)  │◀───│   │    └── search_project_docs │    │
-│  └───────────┘    │   ├── (HR Agent)               │    │
-│                   │   └── (추가 Agent...)           │    │
-│                   └──────────┬─────────────────────┘    │
+│  │ 👍👎 피드백│    │   ├── (HR Agent)               │    │
+│  │ 🔍 추론   │    │   └── (추가 Agent...)           │    │
+│  └───────────┘    └──────────┬─────────────────────┘    │
 │                              │                          │
-│  ┌───────────────┐    ┌──────▼──────┐                   │
-│  │ knowledge-    │    │ Amazon      │                   │
-│  │ base/*.md     │    │ Bedrock     │                   │
-│  │ (로컬 KB)     │    │ Claude 3.5  │                   │
-│  └───────────────┘    └─────────────┘                   │
+│  ┌───────────────┐    ┌──────▼──────┐  ┌────────────┐  │
+│  │ knowledge-    │    │ Amazon      │  │ feedback   │  │
+│  │ base/*.md     │    │ Bedrock     │  │ .json      │  │
+│  │ (로컬 KB)     │    │ Claude 3.5  │  │ (피드백)   │  │
+│  └───────────────┘    └─────────────┘  └────────────┘  │
 └─────────────────────────────────────────────────────────┘
+```
+
+#### Template UI 기능
+- **추론 과정 표시**: Strands Hooks로 도구 호출 자동 캡처 → 처리 과정 + 상세 보기
+- **피드백 버튼**: 👍/👎 cl.Action 버튼 → 로컬 JSON 저장 (AWS 시 DynamoDB)
+- **동적 환영 메시지**: supervisor.py의 ask_*_agent 도구 자동 감지
 ```
 
 ### AWS 배포 (AgentCore)
@@ -185,6 +191,45 @@ kiro chat --agent agent-builder
 
 ---
 
+## 🤖 Kiro CLI Agent 협업 워크플로
+
+Agent Builder로 코드를 생성하면, Review Agent가 리뷰하고, Deployment Agent가 배포합니다.
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  kiro chat --agent agent-builder                        │
+│                                                         │
+│  "비용 모니터링 Agent 만들어줘"                         │
+│           ↓                                             │
+│  Agent Builder: 코드 생성                               │
+│           ↓                                             │
+│  "배포해줘" → delegate 워크플로 시작                    │
+│           ↓                                             │
+│  ┌─────────────────┐    ┌──────────────────────┐        │
+│  │ Review Agent    │───▶│ Deployment Agent     │        │
+│  │ 코드 리뷰       │    │ ECR → AgentCore 배포 │        │
+│  │ (체크리스트 기반)│    │ (가이드 기반)        │        │
+│  └─────────────────┘    └──────────────────────┘        │
+└─────────────────────────────────────────────────────────┘
+```
+
+```bash
+# Agent Builder (코드 생성 + delegate)
+kiro chat --agent agent-builder
+
+# Review Agent (코드 리뷰 단독 실행)
+kiro chat --agent review
+
+# Deployment Agent (배포 단독 실행)
+kiro chat --agent deployment
+```
+
+→ Agent 정의 파일: `templates/local/*.json`
+→ [배포 가이드: docs/deployment-guide.md](docs/deployment-guide.md)
+→ [리뷰 체크리스트: docs/review-checklist.md](docs/review-checklist.md)
+
+---
+
 ## 📁 프로젝트 구조
 
 ```
@@ -193,12 +238,17 @@ aiops-starter-kit/
 │   ├── local/                    # 로컬 배포 템플릿
 │   │   ├── setup.sh             # 원클릭 설치
 │   │   ├── app.py               # Chainlit UI
-│   │   ├── agent-builder.json   # Kiro CLI 연동
+│   │   ├── config.py            # 모델/리전 설정
+│   │   ├── feedback_store.py    # 피드백 저장 (로컬 JSON, AWS시 DynamoDB)
+│   │   ├── agent-builder.json   # Kiro CLI Agent Builder
+│   │   ├── review-agent.json    # Kiro CLI Review Agent
+│   │   ├── deployment-agent.json # Kiro CLI Deployment Agent
 │   │   └── agents/
 │   │       ├── supervisor.py    # Multi-Agent 조율
 │   │       ├── guide_agent.py   # 프로젝트 가이드 챗봇
+│   │       ├── mcp_agent.py     # MCP 연동 예시 Agent
+│   │       ├── case_tools.py    # 사례 저장 도구
 │   │       ├── main.py          # AgentCore HTTP 서버
-│   │       ├── handler.py       # 요청 핸들러
 │   │       ├── Dockerfile       # 컨테이너 빌드
 │   │       └── requirements.txt # Agent 의존성
 │   │
@@ -215,7 +265,7 @@ aiops-starter-kit/
 │   ├── analytics/               # Analytics 가이드
 │   └── monitoring/              # Monitoring 가이드
 │
-├── src/                          # PoC 구현 (참고용)
+├── src/                          # PoC 구현 (게임 운영 시나리오, 참고용)
 │   ├── agent/                   # Agent 구현 예시
 │   └── tools/                   # 도구 구현 예시
 │
@@ -225,7 +275,9 @@ aiops-starter-kit/
 │
 └── docs/                         # 문서
     ├── QUICKSTART-LOCAL.md      # 로컬 배포 가이드
-    └── QUICKSTART-AWS.md        # AWS 배포 가이드
+    ├── QUICKSTART-AWS.md        # AWS 배포 가이드
+    ├── deployment-guide.md      # Agent 배포 절차
+    └── review-checklist.md      # 코드 리뷰 체크리스트
 ```
 
 ---
@@ -241,6 +293,10 @@ aiops-starter-kit/
 | [TUTORIAL-MULTI-AGENT.md](docs/TUTORIAL-MULTI-AGENT.md) | Multi-Agent 구성 | 30분 |
 | [BEST-PRACTICES.md](docs/BEST-PRACTICES.md) | 실패 사례와 교훈 | 15분 |
 | [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | 문제 해결 가이드 | - |
+| [deployment-guide.md](docs/deployment-guide.md) | Agent 배포 절차 (ECR/AgentCore) | 15분 |
+| [review-checklist.md](docs/review-checklist.md) | Agent 코드 리뷰 체크리스트 | 10분 |
+| [TUTORIAL-MCP-AGENT.md](docs/TUTORIAL-MCP-AGENT.md) | MCP 연동 Agent 만들기 | 30분 |
+| [TUTORIAL-NEWS-AGENT.md](docs/TUTORIAL-NEWS-AGENT.md) | 뉴스 Agent 시나리오 (Agent Builder 활용) | 30분 |
 
 ---
 
@@ -315,9 +371,9 @@ pytest tests/ -v
 
 ```
 ai-agent-platform/
-├── app.py                      # Chainlit UI
-├── logs_api.py                 # 로그/피드백 API
-├── src/
+├── app.py                      # Chainlit UI (PoC용)
+├── logs_api.py                 # 로그/피드백 API (PoC용)
+├── src/                        # PoC 구현 (게임 운영 시나리오)
 │   ├── agent/
 │   │   ├── supervisor_agent.py # Supervisor
 │   │   ├── devops_agent.py     # DevOps Agent (예시)
@@ -377,6 +433,23 @@ chainlit run app.py
 ### v1.3 - 자동 개선 제안 ✅
 - [x] 부정 피드백 분석 도구
 - [x] 개선 제안 자동화
+
+### v1.4 - Kiro CLI Agent 체계화 ✅
+- [x] deployment-agent (배포 전문)
+- [x] review-agent (코드 리뷰 전문)
+- [x] agent-builder 개선 (delegate 패턴)
+- [x] Agent 간 위임 워크플로 (review → deployment)
+
+### v1.5 - MCP 연동 지원 ✅
+- [x] MCP 연동 예시 Agent (AWS Docs MCP Server)
+- [x] TUTORIAL-MCP-AGENT.md
+- [x] Agent Builder MCP 패턴 지원
+
+### v1.6 - Template UI 개선 ✅
+- [x] 추론 과정 표시 (Strands Hooks → ToolCallTracker)
+- [x] 피드백 버튼 (cl.Action → 로컬 JSON / AWS DynamoDB)
+- [x] 동적 환영 메시지 (supervisor의 ask_*_agent 자동 감지)
+- [x] 뉴스 Agent 시나리오 + 튜토리얼
 
 ### v2.0 - 자동화 워크플로우 (예정)
 - [ ] 스케줄러 (정기 분석)
@@ -475,6 +548,9 @@ kiro chat --agent agent-builder
 ### v1.1 - Feedback Collection ✅
 ### v1.2 - Agent Builder Agent ✅
 ### v1.3 - Auto Improvement Suggestions ✅
+### v1.4 - Kiro CLI Agent Orchestration ✅
+### v1.5 - MCP Integration ✅
+### v1.6 - Template UI Improvements ✅
 ### v2.0 - Automation Workflow (Planned)
 
 ---

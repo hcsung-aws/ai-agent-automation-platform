@@ -1,8 +1,9 @@
 """CloudFormation stack events tool for DevOps Agent."""
 import boto3
 from strands import tool
+from src.config import REGION_NAME
 
-cfn = boto3.client("cloudformation", region_name="us-east-1")
+cfn = boto3.client("cloudformation", region_name=REGION_NAME)
 
 
 @tool

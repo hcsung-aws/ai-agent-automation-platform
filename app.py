@@ -6,10 +6,11 @@ import chainlit as cl
 from strands import Agent, tool
 from strands.models import BedrockModel
 
+from src.config import MODEL_ID, REGION_NAME
 from src.agent.devops_agent import create_devops_agent
 from src.agent.analytics_agent import create_analytics_agent
 from src.agent.godot_review_agent import create_godot_review_agent
-from src.agent.monitoring_agent import create_monitoring_agent
+from src.agent.monitoring_agent import create_monitoring_agent, IS_TEST_MODE as MONITORING_TEST_MODE
 from src.utils.execution_logger import (
     log_execution, generate_session_id, 
     log_feedback, generate_message_id
@@ -66,8 +67,8 @@ def create_visualized_supervisor(on_step: Callable):
         nonlocal monitoring_agent
         on_step("monitoring", "start", query)
         if monitoring_agent is None:
-            monitoring_agent, is_test = create_monitoring_agent()
-            if is_test:
+            monitoring_agent = create_monitoring_agent()
+            if MONITORING_TEST_MODE:
                 test_mode_agents.add("monitoring")
         response = str(monitoring_agent(query))
         on_step("monitoring", "end", response, "monitoring" in test_mode_agents)
@@ -130,8 +131,8 @@ def create_visualized_supervisor(on_step: Callable):
 """
 
     model = BedrockModel(
-        model_id="us.anthropic.claude-3-5-sonnet-20241022-v2:0",
-        region_name="us-east-1",
+        model_id=MODEL_ID,
+        region_name=REGION_NAME,
     )
     
     return Agent(

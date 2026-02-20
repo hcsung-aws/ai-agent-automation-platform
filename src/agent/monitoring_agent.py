@@ -1,12 +1,14 @@
 """Monitoring Agent - CloudWatch 알람 모니터링 전문가."""
+import os
 from strands import Agent
 from strands.models import BedrockModel
 
+from src.config import MODEL_ID, REGION_NAME
 from src.tools.monitoring_tools import get_alarm_status, get_alarm_history, analyze_alarm_issues
 from src.tools.kb_tools import search_monitoring_knowledge
 
-# 테스트 모드 플래그 (실제 API 연동 시 False로 변경)
-IS_TEST_MODE = True
+# 테스트 모드 플래그 (환경변수 MONITORING_TEST_MODE=false 로 해제)
+IS_TEST_MODE = os.environ.get("MONITORING_TEST_MODE", "true").lower() != "false"
 
 SYSTEM_PROMPT = """당신은 CloudWatch 알람 모니터링 전문가 AI 에이전트입니다.
 게임 인프라의 알람 상태를 실시간으로 모니터링하고 분석합니다.
@@ -37,18 +39,14 @@ Knowledge Base 활용:
 """
 
 
-def create_monitoring_agent() -> tuple:
-    """Create and return Monitoring Agent instance with test mode flag.
-    
-    Returns:
-        tuple: (Agent instance, is_test_mode: bool)
-    """
+def create_monitoring_agent() -> Agent:
+    """Create and return Monitoring Agent instance."""
     model = BedrockModel(
-        model_id="us.anthropic.claude-3-5-sonnet-20241022-v2:0",
-        region_name="us-east-1",
+        model_id=MODEL_ID,
+        region_name=REGION_NAME,
     )
     
-    agent = Agent(
+    return Agent(
         model=model,
         system_prompt=SYSTEM_PROMPT,
         tools=[
@@ -58,15 +56,13 @@ def create_monitoring_agent() -> tuple:
             search_monitoring_knowledge,
         ],
     )
-    
-    return agent, IS_TEST_MODE
 
 
 # For direct testing
 if __name__ == "__main__":
     agent = create_monitoring_agent()
     
-    print("Monitoring Agent 시작. 'quit'으로 종료.")
+    print(f"Monitoring Agent 시작 (테스트 모드: {IS_TEST_MODE}). 'quit'으로 종료.")
     print("-" * 50)
     
     while True:

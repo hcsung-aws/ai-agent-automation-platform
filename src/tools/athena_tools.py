@@ -2,6 +2,7 @@
 import boto3
 import time
 from strands import tool
+from src.config import REGION_NAME
 
 ATHENA_DATABASE = "game_logs"
 ATHENA_OUTPUT = "s3://devops-agent-kb-965037532757/athena-results/"
@@ -18,7 +19,7 @@ def run_athena_query(query: str, database: str = ATHENA_DATABASE) -> str:
     Returns:
         쿼리 결과 (최대 100행)
     """
-    client = boto3.client("athena", region_name="us-east-1")
+    client = boto3.client("athena", region_name=REGION_NAME)
     
     # 쿼리 실행
     response = client.start_query_execution(
@@ -71,7 +72,7 @@ def list_athena_tables(database: str = ATHENA_DATABASE) -> str:
     Returns:
         테이블 목록
     """
-    client = boto3.client("glue", region_name="us-east-1")
+    client = boto3.client("glue", region_name=REGION_NAME)
     
     try:
         response = client.get_tables(DatabaseName=database)
@@ -102,7 +103,7 @@ def get_table_schema(table_name: str, database: str = ATHENA_DATABASE) -> str:
     Returns:
         테이블 스키마 정보
     """
-    client = boto3.client("glue", region_name="us-east-1")
+    client = boto3.client("glue", region_name=REGION_NAME)
     
     try:
         response = client.get_table(DatabaseName=database, Name=table_name)
