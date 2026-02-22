@@ -180,6 +180,20 @@ AWS_REGION=us-east-1 aws logs filter-log-events \
 - supervisor.py 수정 없이 app.py에서 ToolCallTracker로 추론 과정 캡처
 - Pattern: HookProvider 구현 → BeforeToolCallEvent/AfterToolCallEvent 콜백
 
+### Mickey 20: Chainlit에서 Strands Agent 호출은 asyncio.to_thread 필수
+- Problem: async 함수 안에서 supervisor() 동기 호출 → 이벤트 루프 블록 → WebSocket 끊김 → 세션 재시작 → 환영 메시지 재출력
+- Solution: `response = await asyncio.to_thread(supervisor, message.content)`
+- Avoid: Chainlit on_message 안에서 Strands Agent를 직접 동기 호출
+
+### Mickey 20: Chainlit cl.Action에 disabled 없음
+- 비활성화 대안: `msg.remove_actions()` + `msg.actions = []` + content 추가 + `msg.update()`
+- Avoid: cl.Action에 disabled 속성 기대
+
+### Mickey 20: Multi-Agent에서 URL/링크 소실 방지
+- Problem: Sub-Agent LLM → Supervisor LLM 2단계 요약 시 URL이 "링크 참고"로 축약됨
+- Solution: 3계층 SYSTEM_PROMPT에 링크 보존 원칙 명시 (도구→Sub-Agent→Supervisor)
+- Rule: URL/데이터 보존이 필요하면 각 계층 SYSTEM_PROMPT에 명시 필수
+
 ## File Locations
 - Source: src/ (예정)
 - Infrastructure: infra/ (예정)
@@ -195,6 +209,15 @@ AWS_REGION=us-east-1 aws logs filter-log-events \
 - Problem: kb_tools.py(전체 문자열 매칭)와 guide_agent.py(단어 매칭)에서 같은 폴백 체인을 각각 구현, 검색 품질 차이 발생
 - Solution: 단어 매칭으로 통일
 - Rule: 같은 검색 로직을 여러 파일에 구현하지 말 것. 새 검색 로직 추가 시 기존 구현과 통일 확인 필수
+
+### Mickey 21: Docker 빌드 시 agents/ 외부 파일 누락 주의
+- Problem: config.py가 agents/ 밖에 있어 Docker COPY . . 시 누락 → 런타임 import 에러
+- Cause: Dockerfile이 agents/ 디렉토리 기준, config.py는 상위 디렉토리
+- Rule: Docker 빌드 대상 디렉토리 안에 필요한 모든 파일이 있는지 확인 필수
+
+### Mickey 21: CDK 스택에서 경로 하드코딩 금지
+- Problem: agentcore_stack.py의 agent_path가 하드코딩 → 커스텀 agent 배포 불가
+- Rule: CDK context 또는 환경변수로 경로를 받아야 유연한 배포 가능
 
 ### Mickey 20: 피드백과 사례는 보완 관계
 - 피드백: "뭘 고칠지" 신호 (👍/👎) → 스케줄러가 분석하여 개선 방향 도출
@@ -218,5 +241,22 @@ AWS_REGION=us-east-1 aws logs filter-log-events \
 - `MONITORING_TEST_MODE`: monitoring agent 테스트 모드 (기본값: true, false로 해제)
 - `CDK_DEFAULT_REGION`: CDK 배포 region
 
+### Mickey 22: CDK from_asset() file 옵션으로 build context 분리
+- Problem: config.py가 agents/ 밖에 있어 Docker 빌드 시 누락
+- Cause: build context가 agents/이면 상위 파일 접근 불가
+- Solution: `from_asset(directory="local/", file="agents/Dockerfile")`로 build context를 상위로 변경
+- Rule: Docker 빌드 시 외부 파일 의존성이 있으면 build context를 상위로 올리고 file 옵션으로 Dockerfile 위치 지정
+
+### Mickey 23: S3 Vectors가 OpenSearch Serverless보다 CDK 자동화에 유리
+- Context: Bedrock KB 벡터 스토어 선택
+- S3 Vectors: CfnVectorBucket + CfnIndex (CloudFormation 네이티브, 2개 리소스)
+- OpenSearch Serverless: vector index가 CloudFormation 미지원 → Custom Resource Lambda 필요
+- Rule: CDK 자동화 우선이면 S3 Vectors 선택
+
+### Mickey 23: CfnIndex metadata_configuration에 Bedrock 키 필수
+- Problem: Bedrock KB가 S3 Vectors에 메타데이터를 저장하려면 키 설정 필요
+- Solution: nonFilterableMetadataKeys에 "AMAZON_BEDROCK_TEXT", "AMAZON_BEDROCK_METADATA" 추가
+- Rule: Bedrock KB + S3 Vectors 조합 시 CfnIndex에 메타데이터 키 설정 필수
+
 ## Last Updated
-Mickey 19 - 2026-02-20
+Mickey 23 - 2026-02-21

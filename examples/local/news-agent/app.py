@@ -7,6 +7,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent / "agents"))
 sys.path.insert(0, str(Path(__file__).parent))
 
+import asyncio
 import json
 import chainlit as cl
 from strands.hooks import HookProvider, BeforeToolCallEvent, AfterToolCallEvent
@@ -117,7 +118,7 @@ async def main(message: cl.Message):
         _init_supervisor()
 
     _tracker.reset()
-    response = supervisor(message.content)
+    response = await asyncio.to_thread(supervisor, message.content)
 
     content = str(response) + _format_reasoning(_tracker.calls)
     msg_id = cl.user_session.get("_msg_counter", 0)
@@ -131,19 +132,34 @@ async def main(message: cl.Message):
     msg = cl.Message(content=content, actions=actions)
     await msg.send()
 
-    # 피드백용 대화 쌍 저장
+    # 피드백용 대화 쌍 + 메시지 객체 저장
     messages = cl.user_session.get("messages", {})
     messages[mid] = {
         "user_input": message.content,
         "agent_response": str(response),
+        "msg": msg,
     }
     cl.user_session.set("messages", messages)
+
+
+async def _mark_feedback(action: cl.Action, label: str):
+    """피드백 버튼을 제거하고 선택 결과를 메시지에 표시."""
+    pair = cl.user_session.get("messages", {}).get(action.payload["mid"])
+    if not pair:
+        return None
+    msg = pair.get("msg")
+    if msg:
+        await msg.remove_actions()
+        msg.actions = []
+        msg.content += f"\n\n> {label}"
+        await msg.update()
+    return pair
 
 
 @cl.action_callback("feedback_positive")
 async def on_positive(action: cl.Action):
     """긍정 피드백 저장."""
-    pair = cl.user_session.get("messages", {}).get(action.payload["mid"])
+    pair = await _mark_feedback(action, "✅ 👍 좋아요")
     if not pair:
         return
     save_feedback(
@@ -152,12 +168,14 @@ async def on_positive(action: cl.Action):
         user_input=pair["user_input"],
         agent_response=pair["agent_response"],
     )
-    await cl.Message(content="✅ 피드백 감사합니다! 👍").send()
 
 
 @cl.action_callback("feedback_negative")
 async def on_negative(action: cl.Action):
     """부정 피드백 — 코멘트 요청."""
+    pair = await _mark_feedback(action, "👎 아쉬워요")
+    if not pair:
+        return
     cl.user_session.set("pending_feedback_mid", action.payload["mid"])
     cl.user_session.set("awaiting_feedback_comment", True)
     await cl.Message(content="어떤 점이 아쉬웠나요? (건너뛰려면 '건너뛰기' 입력)").send()

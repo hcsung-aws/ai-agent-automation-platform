@@ -23,7 +23,7 @@ infra_stack = InfrastructureStack(
     app, f"{stack_prefix}Infrastructure",
     env=env,
     stack_prefix=stack_prefix,
-    description=f"{stack_prefix} 스타터 킷 - 기반 인프라 (ECR, IAM, KMS, KB S3)",
+    description=f"{stack_prefix} Starter Kit - Infrastructure (ECR, IAM, KMS, KB S3, S3 Vectors, Bedrock KB)",
 )
 
 # 2. AgentCore 스택
@@ -34,8 +34,10 @@ agentcore_stack = AgentCoreStack(
     agent_role_arn=infra_stack.agent_role.role_arn,
     kms_key_arn=infra_stack.kms_key.key_arn,
     kb_bucket=infra_stack.kb_bucket,
+    feedback_table=infra_stack.feedback_table,
+    kb_id=infra_stack.kb_id,
     stack_prefix=stack_prefix,
-    description=f"{stack_prefix} 스타터 킷 - AgentCore (Runtime, Gateway, Memory)",
+    description=f"{stack_prefix} Starter Kit - AgentCore (Runtime, Gateway, Memory)",
 )
 
 # 의존성 설정

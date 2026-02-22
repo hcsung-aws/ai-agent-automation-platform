@@ -70,6 +70,7 @@ def tool_name(param: str) -> str:
 - `@tool` 데코레이터 필수
 - docstring에 Args, Returns 명시 (Agent가 도구 선택 시 참조)
 - 반환값은 항상 `str`
+- URL/링크를 포함하는 도구는 마크다운 `[텍스트](URL)` 형식으로 반환
 
 ---
 
@@ -91,6 +92,7 @@ SYSTEM_PROMPT = """당신은 [역할] 전문가 AI 에이전트입니다.
 응답 원칙:
 - 한국어로 응답
 - [추가 원칙]
+- 도구가 반환하는 URL/링크는 마크다운 [텍스트](URL) 형식으로 응답에 반드시 포함
 """
 
 def create_{name}_agent() -> Agent:
@@ -168,6 +170,12 @@ agent = Agent(
 - [영역 2]
 ```
 
+### 6. Supervisor SYSTEM_PROMPT 응답 원칙에 링크 보존 추가
+```
+## 응답 원칙
+- 하위 Agent가 제공한 URL/링크를 그대로 보존 (요약 시에도 생략 금지)
+```
+
 ---
 
 ## 체크리스트
@@ -203,6 +211,58 @@ chainlit run app.py --port 8000
 - src/agent/supervisor_agent.py
 - src/tools/cloudwatch_tools.py
 - src/tools/kb_tools.py (KB 연동 패턴)
+
+---
+
+## AWS KB 자동 생성 + Sync
+
+### 개요
+
+`deploy.sh`로 AWS 배포 시 KB 인프라가 자동 생성됩니다:
+- S3 Vectors 벡터 스토어 + Bedrock Knowledge Base + DataSource
+- S3 → SQS → Lambda 자동 Sync 파이프라인
+
+Agent 코드에서 수동 KB 생성은 불필요합니다.
+
+### 동작 흐름
+
+```
+deploy.sh 실행
+  → CDK: S3 Vectors + Bedrock KB + DataSource 자동 생성
+  → CDK: S3 이벤트 → SQS → Lambda (자동 Sync) 파이프라인 생성
+  → knowledge-base/ → S3 sync → 자동 ingestion
+  → AgentCore Runtime에 KNOWLEDGE_BASE_ID 환경변수 자동 설정
+```
+
+### KB 연동 Agent의 환경변수 폴백 패턴
+
+guide_agent.py에 구현된 3단계 폴백 체인을 따릅니다:
+
+```python
+import os
+from pathlib import Path
+
+KNOWLEDGE_BASE_ID = os.environ.get("KNOWLEDGE_BASE_ID", "")
+KB_S3_BUCKET = os.environ.get("KB_S3_BUCKET", "")
+LOCAL_KB_PATH = Path(os.environ.get("LOCAL_KB_PATH", "knowledge-base"))
+```
+
+```
+1. KNOWLEDGE_BASE_ID 설정 시 → Bedrock KB 시맨틱 검색 (AWS 배포 시 자동)
+2. KB_S3_BUCKET 설정 시 → S3 키워드 검색 (폴백)
+3. LOCAL_KB_PATH → 로컬 파일 키워드 검색 (개발 환경)
+```
+
+로컬에서는 `knowledge-base/` 폴더로 동작하고, AWS 배포 시 CDK가 KNOWLEDGE_BASE_ID를 자동 주입하므로 **코드 변경 없이** 시맨틱 검색으로 전환됩니다.
+
+### KB 문서 추가 (배포 후)
+
+자동 Sync가 설정되어 있으므로 S3에 파일만 업로드하면 됩니다:
+
+```bash
+aws s3 cp my-doc.md s3://{KB_BUCKET}/knowledge-base/devops/
+# → S3 이벤트 → SQS → Lambda → StartIngestionJob 자동 실행
+```
 
 ---
 
@@ -362,3 +422,44 @@ KB 활용 원칙:
 - [ ] 사용자 확인 후 수정 진행
 - [ ] 새 도구 추가 시 import 및 tools 배열 업데이트
 - [ ] 시스템 프롬프트 수정 시 기존 내용 유지하며 추가
+
+---
+
+## AWS 배포
+
+### 프로젝트 구조 (Docker 빌드 관점)
+
+```
+templates/local/          ← Docker build context
+├── config.py             ← COPY config.py . (Dockerfile에서 복사)
+├── .dockerignore         ← 불필요 파일 제외
+├── agents/
+│   ├── Dockerfile        ← from_asset(local/, file="agents/Dockerfile")
+│   ├── main.py           ← AgentCore HTTP 엔트리포인트
+│   ├── supervisor.py
+│   ├── guide_agent.py
+│   └── requirements.txt
+```
+
+- build context가 `templates/local/`이므로 config.py가 자동 포함됨
+- `from config import MODEL_ID, REGION_NAME`이 Docker 컨테이너에서도 동작
+
+### 새 Agent 추가 후 AWS 재배포
+
+1. `agents/` 안에 새 agent 파일 생성
+2. `agents/supervisor.py`에 연결 (체크리스트 참조)
+3. pip 패키지 추가 시 `agents/requirements.txt` 업데이트
+4. 재배포:
+   ```bash
+   cd templates/aws && ./deploy.sh
+   ```
+   CDK가 자동으로 Docker 빌드 → ECR 푸시 → Runtime 업데이트
+
+### 커스텀 프로젝트 배포
+
+기본 template이 아닌 별도 프로젝트를 배포할 때:
+```bash
+cd templates/aws && ./deploy.sh /path/to/my-project
+```
+- `/path/to/my-project/` 안에 `agents/` 디렉토리와 `config.py`가 있어야 함
+- `agents/Dockerfile`, `agents/main.py` 필수

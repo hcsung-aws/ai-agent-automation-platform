@@ -1,0 +1,10 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+.env.example
+knowledge-base/
+*.json
+app.py
+setup.sh
+feedback_store.py

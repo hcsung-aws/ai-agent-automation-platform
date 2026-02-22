@@ -1,230 +1,172 @@
 # ☁️ AWS 배포 빠른 시작 (30분)
 
-이 가이드를 따라 AWS에 AgentCore 기반 AIOps 환경을 배포합니다.
+이 가이드를 따라 AWS AgentCore에 Agent를 배포합니다.
+CDK가 Docker 빌드 → ECR 푸시 → Runtime 생성을 자동으로 처리합니다.
 
 ## 사전 요구사항
 
 - AWS 계정 (관리자 권한 권장)
-- AWS CLI 설정 완료
+- AWS CLI 설정 완료 (`aws configure`)
 - Node.js 18+ (CDK용)
-- Docker (컨테이너 빌드용)
+- Docker 실행 중
+- Bedrock Claude 모델 접근 활성화 (AWS 콘솔 → Bedrock → Model access)
 
 ## 아키텍처 개요
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                        AWS Cloud                            │
-│  ┌─────────────────┐  ┌─────────────────┐                  │
-│  │  AgentCore      │  │  AgentCore      │                  │
-│  │  Runtime        │──│  Gateway        │                  │
-│  │  (Agent 호스팅) │  │  (도구 연결)    │                  │
-│  └────────┬────────┘  └────────┬────────┘                  │
-│           │                    │                            │
-│  ┌────────▼────────┐  ┌────────▼────────┐                  │
-│  │  AgentCore      │  │  Lambda         │                  │
-│  │  Memory         │  │  (도구 구현)    │                  │
-│  │  (컨텍스트)     │  │                 │                  │
-│  └─────────────────┘  └─────────────────┘                  │
-│                                                             │
-│  ┌─────────────────┐  ┌─────────────────┐                  │
-│  │  ECR            │  │  KMS            │                  │
-│  │  (컨테이너)     │  │  (암호화)       │                  │
-│  └─────────────────┘  └─────────────────┘                  │
-└─────────────────────────────────────────────────────────────┘
-```
-
-## 1단계: 저장소 클론 (1분)
-
-```bash
-git clone https://github.com/your-org/aiops-starter-kit.git
-cd aiops-starter-kit/templates/aws
-```
-
-## 2단계: 배포 스크립트 실행 (10분)
-
-```bash
-./deploy.sh
-```
-
-배포 스크립트가 자동으로:
-1. AWS 자격증명 확인
-2. CDK Bootstrap (최초 1회)
-3. 인프라 스택 배포 (ECR, IAM, KMS)
-4. AgentCore 스택 배포 (Memory, Gateway)
-
-## 3단계: Agent 컨테이너 빌드 및 푸시 (5분)
-
-```bash
-# 환경 변수 설정
-ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-REGION=us-east-1
-
-# 로컬 템플릿으로 컨테이너 빌드
-cd ../local
-docker build -t aiops-agent .
-
-# ECR 로그인
-aws ecr get-login-password --region $REGION | \
-  docker login --username AWS --password-stdin $ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com
-
-# 태그 및 푸시
-docker tag aiops-agent:latest $ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com/aiops-agents:latest
-docker push $ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com/aiops-agents:latest
-```
-
-## 4단계: AgentCore Runtime 생성 (10분)
-
-```bash
-# Agent 생성
-aws bedrock create-agent \
-  --agent-name aiops-supervisor \
-  --agent-resource-role-arn arn:aws:iam::$ACCOUNT_ID:role/AIOpsInfrastructure-AgentCoreRole \
-  --foundation-model anthropic.claude-3-5-sonnet-20241022-v2:0 \
-  --instruction "당신은 AI Agent 팀의 Supervisor입니다. 사용자 요청을 분석하여 적절한 Agent에게 위임합니다."
-
-# Agent ID 확인
-AGENT_ID=$(aws bedrock list-agents --query "agentSummaries[?agentName=='aiops-supervisor'].agentId" --output text)
-echo "Agent ID: $AGENT_ID"
-```
-
-## 5단계: Gateway에 도구 연결 (5분)
-
-```bash
-# 도구 Lambda ARN 확인
-TOOL_LAMBDA_ARN=$(aws cloudformation describe-stacks \
-  --stack-name AIOpsAgentCore \
-  --query "Stacks[0].Outputs[?OutputKey=='ToolLambdaArn'].OutputValue" \
-  --output text)
-
-# Action Group 생성
-aws bedrock create-agent-action-group \
-  --agent-id $AGENT_ID \
-  --agent-version DRAFT \
-  --action-group-name tools \
-  --action-group-executor lambdaArn=$TOOL_LAMBDA_ARN \
-  --api-schema '{"type": "FUNCTION_SCHEMA", "functions": [{"name": "echo", "description": "메시지 반환", "parameters": {"message": {"type": "string", "description": "반환할 메시지"}}}]}'
-```
-
-## 6단계: Agent 준비 및 테스트
-
-```bash
-# Agent 준비
-aws bedrock prepare-agent --agent-id $AGENT_ID
-
-# 테스트
-aws bedrock-agent-runtime invoke-agent \
-  --agent-id $AGENT_ID \
-  --agent-alias-id TSTALIASID \
-  --session-id test-session \
-  --input-text "안녕하세요"
+┌─ AIOpsInfrastructure Stack ─────────────────────────────┐
+│  ECR (컨테이너) │ KMS (암호화) │ S3 (KB) │ DynamoDB    │
+│  S3 Vectors + Bedrock KB (자동 생성)                    │
+│  SQS + Lambda (KB 자동 Sync 파이프라인)                 │
+└─────────────────────────────────────────────────────────┘
+┌─ AIOpsAgentCore Stack ──────────────────────────────────┐
+│  AgentCore Runtime (Supervisor Agent, ARM64 컨테이너)   │
+│  AgentCore Memory (대화 컨텍스트)                       │
+└─────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 7단계: Knowledge Base 생성 (선택)
-
-> ⚠️ **주의**: Bedrock Knowledge Base는 CDK/CloudFormation으로 완전 자동화가 어렵습니다.
-> 데이터 소스 동기화, 임베딩 모델 설정 등 수동 단계가 필요합니다.
-
-Agent가 문서를 검색하여 답변하려면 Knowledge Base를 생성해야 합니다.
-
-### 7-1. S3에 문서 업로드
+## Step 1: 저장소 클론 (1분)
 
 ```bash
-# 문서용 S3 버킷 생성
-aws s3 mb s3://aiops-kb-docs-$ACCOUNT_ID-$REGION
-
-# 문서 업로드 (예: docs 폴더)
-aws s3 sync ./docs s3://aiops-kb-docs-$ACCOUNT_ID-$REGION/docs/
+git clone https://github.com/hcsung-aws/ai-agent-automation-platform.git
+cd ai-agent-automation-platform
 ```
 
-### 7-2. Knowledge Base 생성 (콘솔)
-
-AWS 콘솔에서 생성하는 것이 가장 안정적입니다:
-
-1. **Bedrock 콘솔** → Knowledge bases → Create
-2. **이름**: `aiops-knowledge-base`
-3. **IAM 역할**: 새로 생성 또는 기존 역할 선택
-4. **임베딩 모델**: Titan Embeddings G1 - Text 선택
-5. **벡터 데이터베이스**: Quick create (OpenSearch Serverless 자동 생성)
-6. **데이터 소스**: S3 선택 → `s3://aiops-kb-docs-$ACCOUNT_ID-$REGION` 입력
-7. **Create** 클릭
-
-### 7-3. 데이터 동기화
+## Step 2: 배포 (15분)
 
 ```bash
-# KB ID 확인
-KB_ID=$(aws bedrock-agent list-knowledge-bases \
-  --query "knowledgeBaseSummaries[?name=='aiops-knowledge-base'].knowledgeBaseId" \
+cd templates/aws
+./deploy.sh
+```
+
+deploy.sh가 자동으로 수행하는 작업:
+1. AWS 자격증명 확인
+2. CDK 설치 확인
+3. Python 의존성 설치
+4. CDK Bootstrap (최초 1회)
+5. **2개 스택 배포** (Infrastructure + AgentCore)
+   - Docker 이미지 빌드 (ARM64) → ECR 푸시 → Runtime 생성 포함
+
+### 커스텀 Agent 배포
+
+기본 template 대신 별도 프로젝트를 배포할 때:
+
+```bash
+./deploy.sh /path/to/my-project
+```
+
+프로젝트 구조 요구사항:
+```
+my-project/
+├── config.py             ← 필수 (MODEL_ID, REGION_NAME)
+├── agents/
+│   ├── Dockerfile        ← 필수
+│   ├── main.py           ← 필수 (AgentCore HTTP 엔트리포인트)
+│   ├── supervisor.py     ← 필수
+│   └── requirements.txt  ← 필수
+└── .dockerignore         ← 권장
+```
+
+## Step 3: KB 동기화 (선택, 5분)
+
+CDK가 Bedrock Knowledge Base를 자동 생성합니다. KB 문서를 S3에 동기화하면 자동 Sync 파이프라인이 ingestion을 실행합니다.
+
+```bash
+# KB S3 버킷 확인
+KB_BUCKET=$(aws cloudformation describe-stacks \
+  --stack-name AIOpsInfrastructure \
+  --query "Stacks[0].Outputs[?OutputKey=='KBBucketName'].OutputValue" \
   --output text)
 
-# 데이터 소스 ID 확인
-DS_ID=$(aws bedrock-agent list-data-sources \
-  --knowledge-base-id $KB_ID \
-  --query "dataSourceSummaries[0].dataSourceId" \
-  --output text)
-
-# 동기화 실행
-aws bedrock-agent start-ingestion-job \
-  --knowledge-base-id $KB_ID \
-  --data-source-id $DS_ID
-
-# 동기화 상태 확인
-aws bedrock-agent list-ingestion-jobs \
-  --knowledge-base-id $KB_ID \
-  --data-source-id $DS_ID
+# 로컬 KB를 S3에 동기화
+aws s3 sync knowledge-base/ s3://$KB_BUCKET/knowledge-base/
+# → 자동 Sync: S3 이벤트 → SQS → Lambda → StartIngestionJob
 ```
 
-### 7-4. Agent에 KB 연결
+이후 문서를 추가할 때도 S3에 업로드만 하면 자동으로 ingestion이 실행됩니다.
+
+## Step 4: 배포 검증 (5분)
 
 ```bash
-# Agent에 Knowledge Base 연결
-aws bedrock-agent associate-agent-knowledge-base \
-  --agent-id $AGENT_ID \
-  --agent-version DRAFT \
-  --knowledge-base-id $KB_ID \
-  --description "AIOps 프로젝트 문서"
+REGION=us-east-1
+STACK_PREFIX=AIOps
 
-# Agent 재준비
-aws bedrock-agent prepare-agent --agent-id $AGENT_ID
+# 1. Runtime ID 확인
+RUNTIME_ID=$(aws bedrock-agentcore list-agent-runtimes \
+  --query "agentRuntimeSummaries[?agentRuntimeName=='aiops_supervisor'].agentRuntimeId" \
+  --output text --region $REGION)
+echo "Runtime ID: $RUNTIME_ID"
+
+# 2. Runtime 상태 확인 (ACTIVE면 정상)
+aws bedrock-agentcore get-agent-runtime \
+  --agent-runtime-id $RUNTIME_ID --region $REGION \
+  --query '{Status: agentRuntimeStatus, Name: agentRuntimeName}'
+
+# 3. 테스트 호출
+aws bedrock-agentcore invoke-agent-runtime \
+  --agent-runtime-id $RUNTIME_ID --region $REGION \
+  --runtime-session-id $(python3 -c "import uuid; print(str(uuid.uuid4()))") \
+  --payload '{"prompt": "안녕하세요"}' /dev/stdout
 ```
 
-### 7-5. 환경 변수 설정
+---
 
-`.env` 파일에 KB 정보 추가:
+## Knowledge Base (자동 생성)
+
+CDK 배포 시 다음이 자동으로 생성됩니다:
+- **S3 Vectors** 벡터 스토어 (Titan V2 Embeddings, 1024 dim)
+- **Bedrock Knowledge Base** + DataSource (S3 연결)
+- **자동 Sync 파이프라인** (S3 PUT → SQS → Lambda → StartIngestionJob)
+
+Agent의 `KNOWLEDGE_BASE_ID` 환경변수도 자동 설정되므로, 별도 KB 생성 작업은 불필요합니다.
+
+### 문서 추가
 
 ```bash
-# Bedrock Knowledge Base
-KNOWLEDGE_BASE_ID=your-kb-id        # 위에서 확인한 $KB_ID
-KB_DATA_SOURCE_ID=your-ds-id        # 위에서 확인한 $DS_ID
-KB_S3_BUCKET=aiops-kb-docs-xxx      # 문서 업로드한 S3 버킷
-KB_S3_PREFIX=docs                   # S3 내 문서 경로
+# S3에 업로드만 하면 자동 ingestion
+aws s3 cp my-doc.md s3://$KB_BUCKET/knowledge-base/devops/
 ```
 
-### 7-6. KB 검색 테스트
+---
 
-```bash
-# KB 직접 검색 테스트
-aws bedrock-agent-runtime retrieve \
-  --knowledge-base-id $KB_ID \
-  --retrieval-query '{"text": "Agent Builder 사용법"}'
-```
+## 새 Agent 추가 후 재배포
+
+1. `templates/local/agents/`에 새 agent 파일 생성
+2. `supervisor.py`에 연결
+3. `requirements.txt`에 새 패키지 추가 (필요 시)
+4. 재배포:
+   ```bash
+   cd templates/aws && ./deploy.sh
+   ```
+
+CDK가 변경을 감지하여 자동으로 Docker 재빌드 → ECR 푸시 → Runtime 업데이트합니다.
+
+---
+
+## 환경 변수 커스터마이징
+
+`agentcore_stack.py`의 `environment_variables`에서 설정:
+
+| 변수 | 설명 | 기본값 |
+|------|------|--------|
+| `KNOWLEDGE_BASE_ID` | Bedrock KB ID | (CDK 자동 설정) |
+| `KB_S3_BUCKET` | KB S3 버킷 | (자동 설정) |
+| `KB_S3_PREFIX` | S3 내 KB 경로 | `knowledge-base` |
+| `FEEDBACK_STORAGE` | 피드백 저장소 | `dynamodb` |
+| `FEEDBACK_TABLE` | DynamoDB 테이블명 | (자동 설정) |
 
 ---
 
 ## 보안 원칙
 
-이 템플릿은 AWS 보안 모범 사례를 따릅니다:
-
 | 원칙 | 구현 |
 |------|------|
 | 최소 권한 | IAM 역할에 필요한 권한만 부여 |
 | 암호화 | KMS로 저장 데이터 암호화 |
-| 로깅 | CloudWatch Logs로 모든 활동 기록 |
-| 네트워크 | VPC 엔드포인트 지원 (선택) |
+| 로깅 | CloudWatch Logs (KMS 암호화, 1개월 보관) |
 | 컨테이너 보안 | ECR 이미지 스캔 활성화 |
-
----
 
 ## 비용 예상
 
@@ -232,37 +174,46 @@ aws bedrock-agent-runtime retrieve \
 |--------|---------------|
 | AgentCore Runtime | 사용량 기반 |
 | Bedrock Claude 3.5 | ~$3/1M 토큰 |
-| Lambda | 프리티어 내 |
-| S3 (Memory) | ~$0.023/GB |
+| S3 (KB) | ~$0.023/GB |
 | ECR | ~$0.10/GB |
+| DynamoDB (피드백) | 프리티어 내 |
+
+자세한 비용 예측은 [AWS Pricing Calculator](https://calculator.aws)를 참고하세요.
 
 ---
 
 ## 트러블슈팅
 
-### CDK Bootstrap 실패
+| 문제 | 원인 | 해결 |
+|------|------|------|
+| CDK Bootstrap 실패 | 권한 부족 | 관리자 권한으로 `cdk bootstrap` |
+| Docker 빌드 실패 (ARM64) | buildx 미설정 | `docker buildx create --use` |
+| Bedrock 모델 접근 오류 | 모델 미활성화 | 콘솔 → Bedrock → Model access |
+| AccessDeniedException | inference-profile 누락 | CDK 스택에 이미 포함 (재배포) |
+| Runtime FAILED | 컨테이너 에러 | CloudWatch Logs 확인 |
+| config import 에러 | config.py 누락 | build context가 local/인지 확인 |
+
+### 로그 확인
 
 ```bash
-cdk bootstrap aws://ACCOUNT_ID/REGION --trust ACCOUNT_ID
+# 최근 로그
+aws logs filter-log-events \
+  --log-group-name "/aws/bedrock-agentcore/runtimes/${RUNTIME_ID}-DEFAULT" \
+  --start-time $(($(date +%s) - 3600))000 --limit 30 --region $REGION
+
+# 에러만
+aws logs filter-log-events \
+  --log-group-name "/aws/bedrock-agentcore/runtimes/${RUNTIME_ID}-DEFAULT" \
+  --filter-pattern "ERROR" --limit 20 --region $REGION
 ```
-
-### ECR 푸시 권한 오류
-
-```bash
-aws ecr get-login-password --region $REGION | docker login --username AWS --password-stdin $ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com
-```
-
-### Bedrock 모델 접근 오류
-
-AWS 콘솔 → Bedrock → Model access에서 Claude 3.5 Sonnet 활성화
 
 ---
 
 ## 다음 단계
 
-1. **Agent Builder 연결**: `kiro chat --agent agent-builder`로 새 Agent 생성
-2. **도구 추가**: Lambda 함수로 새 도구 구현 후 Gateway 연결
-3. **Memory 활용**: 대화 컨텍스트 유지로 더 자연스러운 대화
+1. **Agent Builder로 새 Agent 생성**: `kiro chat --agent agent-builder`
+2. **KB 문서 추가**: S3에 .md 파일 업로드 → 자동 ingestion
+3. **피드백 수집**: DynamoDB에 자동 저장되는 👍/👎 피드백 활용
 
 ---
 

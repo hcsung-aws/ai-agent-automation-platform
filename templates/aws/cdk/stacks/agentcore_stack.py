@@ -7,6 +7,7 @@ from pathlib import Path
 from aws_cdk import (
     Stack,
     CfnOutput,
+    aws_dynamodb as dynamodb,
     aws_iam as iam,
     aws_s3 as s3,
 )
@@ -30,6 +31,8 @@ class AgentCoreStack(Stack):
         agent_role_arn: str,
         kms_key_arn: str,
         kb_bucket: s3.IBucket,
+        feedback_table: dynamodb.ITable,
+        kb_id: str = "",
         stack_prefix: str = "AIOps",
         **kwargs
     ) -> None:
@@ -38,8 +41,10 @@ class AgentCoreStack(Stack):
         # 리소스명 접두사 (소문자)
         prefix = stack_prefix.lower()
         
-        # Agent 코드 경로 (로컬 템플릿의 agents 디렉토리)
-        agent_path = Path(__file__).parent.parent.parent.parent / "local" / "agents"
+        # Agent 코드 경로 (CDK context 또는 기본값)
+        agent_path = self.node.try_get_context("agent_path") or str(
+            Path(__file__).parent.parent.parent.parent / "local"
+        )
         
         # === AgentCore Runtime ===
         # 로컬 Dockerfile에서 자동 빌드/푸시
@@ -47,14 +52,17 @@ class AgentCoreStack(Stack):
             self, "SupervisorRuntime",
             runtime_name=f"{prefix}_supervisor",
             agent_runtime_artifact=agentcore.AgentRuntimeArtifact.from_asset(
-                str(agent_path)
+                agent_path,
+                file="agents/Dockerfile",
             ),
             description="AIOps Supervisor Agent - Multi-Agent 협업 조율",
             environment_variables={
-                "KNOWLEDGE_BASE_ID": "",  # 배포 후 Bedrock KB 설정 시 추가
+                "KNOWLEDGE_BASE_ID": kb_id,
                 "KB_S3_BUCKET": kb_bucket.bucket_name,  # S3 폴백용
                 "KB_S3_PREFIX": "knowledge-base",
                 "LOCAL_KB_PATH": "/app/knowledge-base",
+                "FEEDBACK_STORAGE": "dynamodb",
+                "FEEDBACK_TABLE": feedback_table.table_name,
             },
         )
         
@@ -71,8 +79,18 @@ class AgentCoreStack(Stack):
             ],
         ))
         
+        # Bedrock KB 검색 권한
+        self.runtime.add_to_role_policy(iam.PolicyStatement(
+            effect=iam.Effect.ALLOW,
+            actions=["bedrock:Retrieve"],
+            resources=[f"arn:aws:bedrock:{self.region}:{self.account}:knowledge-base/*"],
+        ))
+        
         # S3 KB 버킷 읽기/쓰기 권한 (사례 저장 포함)
         kb_bucket.grant_read_write(self.runtime.role)
+        
+        # DynamoDB 피드백 테이블 읽기/쓰기 권한
+        feedback_table.grant_read_write_data(self.runtime.role)
         
         # === AgentCore Memory ===
         self.memory = agentcore.Memory(

@@ -53,11 +53,15 @@ STACK_PREFIX=$STACK_PREFIX cdk deploy --all --require-approval never
 
 ## Step 2: Docker 이미지 빌드 및 ECR 푸시
 
+> **참고**: CDK `from_asset()`을 사용하면 `cdk deploy` 시 자동으로 Docker 빌드 → ECR 푸시가 수행됩니다.
+> 아래는 수동 빌드가 필요한 경우의 절차입니다.
+
 ```bash
 cd templates/local
 
 # ARM64 이미지 빌드 (AgentCore는 ARM64 전용)
-docker build --platform linux/arm64 -t aiops-agent .
+# build context: templates/local/, Dockerfile: agents/Dockerfile
+docker build --platform linux/arm64 -f agents/Dockerfile -t aiops-agent .
 
 # ECR 로그인
 aws ecr get-login-password --region $REGION | \
@@ -71,6 +75,8 @@ docker push $ECR_URI:latest
 
 **주의사항:**
 - 반드시 `--platform linux/arm64` 사용 (AgentCore Runtime은 ARM64 전용)
+- build context는 `templates/local/` (config.py 포함을 위해)
+- `-f agents/Dockerfile`로 Dockerfile 위치 지정
 - ECR 리포지토리명은 STACK_PREFIX를 소문자로 변환: `${STACK_PREFIX,,}-agents`
 
 **오류 대응:**
@@ -164,3 +170,54 @@ aws bedrock-agentcore invoke-agent-runtime \
 | KMS 권한 오류 | CloudWatch Logs 서비스 권한 없음 | KMS 키 정책에 logs 서비스 추가 |
 | ECR 인증 만료 | 토큰 12시간 유효 | `aws ecr get-login-password` 재실행 |
 | IAM description 오류 | 한글 사용 | description은 영어로 작성 |
+| config import 에러 | config.py가 Docker 이미지에 없음 | build context가 templates/local/인지 확인 |
+
+---
+
+## Agent 추가 후 재배포
+
+새 Agent를 추가하고 AWS에 재배포하는 절차입니다.
+
+### 1. 변경 확인
+
+```bash
+# 새 agent 파일이 agents/ 안에 있는지 확인
+ls templates/local/agents/
+
+# supervisor.py에 연결되었는지 확인
+grep "ask_.*_agent" templates/local/agents/supervisor.py
+
+# requirements.txt에 새 패키지가 추가되었는지 확인
+cat templates/local/agents/requirements.txt
+```
+
+### 2. 재배포
+
+```bash
+cd templates/aws
+./deploy.sh
+```
+
+CDK가 자동으로:
+1. Docker 이미지 재빌드 (변경 감지)
+2. ECR에 새 이미지 푸시
+3. AgentCore Runtime 업데이트
+
+### 3. 검증
+
+```bash
+# Runtime 상태 확인
+RUNTIME_ID=$(aws bedrock-agentcore list-agent-runtimes \
+  --query "agentRuntimeSummaries[?agentRuntimeName=='${STACK_PREFIX,,}_supervisor'].agentRuntimeId" \
+  --output text --region $REGION)
+
+aws bedrock-agentcore get-agent-runtime \
+  --agent-runtime-id $RUNTIME_ID --region $REGION \
+  --query '{Status: agentRuntimeStatus}'
+
+# 테스트 호출
+aws bedrock-agentcore invoke-agent-runtime \
+  --agent-runtime-id $RUNTIME_ID --region $REGION \
+  --runtime-session-id $(python3 -c "import uuid; print(str(uuid.uuid4()))") \
+  --payload '{"prompt": "ping"}' /dev/stdout
+```

@@ -46,8 +46,8 @@ AIOps 스타터 킷 - AI Agent 기반 운영 자동화 플랫폼
 - [x] QUICKSTART 문서 (로컬/AWS)
 
 ## Current Status
-- Session: Mickey 19
-- Progress: v1.5 완료, Template app.py 개선 완료 (추론 과정 + 피드백 버튼)
+- Session: Mickey 24
+- Progress: v1.8 KB 자동 생성 + Sync ✅ 완료
 - AWS 배포: ✅ E2E 검증 완료 (us-east-1)
 - 로컬 환경: ✅ 동작 확인
 - 테스트: ✅ 15/15 통과
@@ -64,7 +64,9 @@ AWS 배포 E2E                ████████████ 100% ✅
 코드 리팩토링               ████████████ 100% ✅
 v1.4 Kiro CLI Agent 체계화  ████████████ 100% ✅
 v1.5 MCP 연동 지원          ████████████ 100% ✅
-v1.6 KB 자동 Sync           ░░░░░░░░░░░░   0%
+v1.6 Template UI 개선       ████████████ 100% ✅
+v1.7 AWS 배포 기반+매뉴얼   ████████████ 100% ✅
+v1.8 KB 자동 생성+Sync      ████████████ 100% ✅
 v2.0 스케줄러/알림           ░░░░░░░░░░░░   0%
 ```
 
@@ -78,13 +80,66 @@ v2.0 스케줄러/알림           ░░░░░░░░░░░░   0%
 - AgentCore Gateway MCP 예시, TUTORIAL-MCP-AGENT.md
 - Agent Builder가 MCP 연동 Agent도 생성 가능하게
 
-### v1.6 - KB 자동 Sync 파이프라인 (2-3일)
-- S3 PUT → SQS → Lambda → Bedrock KB Sync 자동화
-- CDK 스택에 리소스 추가
+### v1.6 - Template UI 개선 (완료)
+- 추론 과정 표시 (Strands Hooks → ToolCallTracker)
+- 피드백 버튼 (cl.Action → 로컬 JSON / AWS DynamoDB)
+- 동적 환영 메시지 (supervisor의 ask_*_agent 자동 감지)
+- 뉴스 Agent 시나리오 + 튜토리얼
+- URL/링크 보존 3계층 원칙
+
+### v1.7 - AWS 배포 기반 + 배포 워크플로 매뉴얼 (2-3일)
+
+로컬에서 만든 agent를 AWS에 배포할 수 있는 기반과, agent-builder/스크립트로 배포하는 방법 및 매뉴얼을 만든다.
+
+사용자 시나리오:
+1. 리포 클론 → agent-builder로 로컬에서 agent 생성/활용
+2. 프로덕션 준비되면 agent-builder 또는 스크립트로 AWS 배포
+3. AWS 환경에서도 agent-builder로 새 agent 생성
+
+#### 1단계: AWS template 개선
+- feedback_store.py: 환경변수(`FEEDBACK_STORAGE`)로 로컬 JSON / DynamoDB 자동 전환
+- CDK infrastructure_stack.py: DynamoDB 피드백 테이블 추가
+- CDK agentcore_stack.py: 환경변수 추가 (FEEDBACK_STORAGE, FEEDBACK_TABLE)
+- deploy.sh: agent 코드 경로를 유연하게 (기본 template + 커스텀 agent 지원)
+
+#### 2단계: agent-builder 배포 워크플로 구축
+- agent-builder.json: AWS template 참조 리소스 추가, 배포 관련 지침 보강
+- agent-builder-guide.md: AWS 배포 섹션 추가 (로컬→AWS 전환 가이드)
+- deployment-agent.json: 새 agent 추가 배포 시나리오 지원
+- deployment-guide.md: 새 agent 추가 배포 절차 추가
+
+#### 3단계: 매뉴얼 작성
+- QUICKSTART-AWS.md 업데이트
+- "로컬 agent → AWS 배포" 튜토리얼 (news-agent를 예시로)
+- agent-builder를 통한 AWS 배포 시나리오 문서
+
+#### 4단계: 검증
+- 매뉴얼대로 agent-builder로 news-agent AWS 배포 시나리오 테스트
+- 발견된 이슈 수정
+
+### v1.8 - KB 자동 생성 + Sync 파이프라인 (3-5일)
+
+처음 접하는 사용자가 KB를 수동 생성 없이 Agent를 AWS에 바로 배포할 수 있도록 한다.
+(참고: https://aws.amazon.com/ko/blogs/tech/agentic-ai-foundation-platform-part1/)
+
+#### KB 자동 생성
+- CreateKnowledgeBase + CreateDataSource API 활용
+- IAM Role 자동 생성 (CDK)
+- 벡터 스토어 설정 (OpenSearch Serverless 또는 S3 Vectors)
+- 임베딩 모델 설정
+- deploy.sh에 KB 생성 단계 추가
+
+#### 자동 Sync 파이프라인
+- S3 PUT 이벤트 → SQS → Lambda → StartIngestionJob
+- CDK 스택에 SQS + Lambda 리소스 추가
+
+#### Agent Builder 연동
+- Agent 생성 시 KB 자동 생성 옵션
+- KB ID 자동 연결
 
 ### v2.0 - 스케줄러/알림
 - EventBridge + Lambda 스케줄러
 - Slack/이메일 알림 연동
 
 ## Last Updated
-Mickey 19 - 2026-02-20
+Mickey 24 - 2026-02-21

@@ -48,3 +48,6 @@ MICKEY-*-AGENT-IMPROVEMENTS.md
 .env.local
 *.pem
 *.key
+
+# Runtime data
+feedback.json

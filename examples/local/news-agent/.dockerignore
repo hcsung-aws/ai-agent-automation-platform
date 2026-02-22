@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+.env.example
+knowledge-base/
+news-data/
+setup.sh
+deploy/cdk.out/
