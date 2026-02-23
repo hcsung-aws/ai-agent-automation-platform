@@ -1,5 +1,5 @@
 #!/bin/bash
-# AIOps 스타터 킷 - AWS 배포 스크립트
+# AIOps 스타터 킷 - AWS 배포 스크립트 (Hybrid Architecture)
 # 사용법: ./deploy.sh [AGENT_PATH]
 #   AGENT_PATH: agent 프로젝트 루트 (config.py + agents/ 포함, 기본: ../local)
 #   환경변수:
@@ -9,9 +9,10 @@
 set -e
 
 echo "🚀 AIOps 스타터 킷 AWS 배포를 시작합니다..."
+echo "   아키텍처: Infrastructure + AgentCore + UI (Fargate)"
 echo ""
 
-# Agent 프로젝트 경로 (config.py + agents/ 포함 디렉토리)
+# Agent 프로젝트 경로
 AGENT_PATH=${1:-${AGENT_PATH:-$(dirname "$0")/../local}}
 AGENT_PATH=$(cd "$AGENT_PATH" 2>/dev/null && pwd || echo "$AGENT_PATH")
 
@@ -55,7 +56,7 @@ fi
 source .venv/bin/activate
 pip install -q aws-cdk-lib constructs
 
-# 4. CDK Bootstrap (최초 1회)
+# 4. CDK Bootstrap
 echo ""
 echo "4️⃣ CDK Bootstrap 확인..."
 if ! aws cloudformation describe-stacks --stack-name CDKToolkit &>/dev/null; then
@@ -67,43 +68,61 @@ echo "✅ Bootstrap 완료"
 # 5. 스택 배포
 echo ""
 echo "5️⃣ 스택 배포..."
-echo ""
 STACK_PREFIX=${STACK_PREFIX:-AIOps}
-PREFIX_LOWER=$(echo "$STACK_PREFIX" | tr '[:upper:]' '[:lower:]')
+echo ""
 echo "스택 접두사: $STACK_PREFIX"
 echo "Agent 경로: $AGENT_PATH"
 echo ""
-echo "배포할 스택:"
-echo "  - ${STACK_PREFIX}Infrastructure (ECR, IAM, KMS, KB S3, S3 Vectors, Bedrock KB, DynamoDB)"
-echo "  - ${STACK_PREFIX}AgentCore (Runtime, Memory)"
+echo "배포할 스택 (3개):"
+echo "  1. ${STACK_PREFIX}Infrastructure (ECR, IAM, KMS, KB, S3 Vectors, DynamoDB)"
+echo "  2. ${STACK_PREFIX}AgentCore (Runtime, Memory)"
+echo "  3. ${STACK_PREFIX}UI (Fargate + Chainlit → AgentCore API 호출)"
 echo ""
 read -p "계속하시겠습니까? (y/n) " -n 1 -r
 echo ""
 
 if [[ $REPLY =~ ^[Yy]$ ]]; then
     STACK_PREFIX=$STACK_PREFIX cdk deploy --all --require-approval never -c agent_path=$AGENT_PATH
-    
+
     echo ""
     echo "=========================================="
     echo "✅ CDK 배포 완료!"
     echo "=========================================="
     echo ""
-    
-    # KB 정보 조회
-    KB_BUCKET=$(aws cloudformation describe-stacks --stack-name ${STACK_PREFIX}Infrastructure --query "Stacks[0].Outputs[?OutputKey=='KBBucketName'].OutputValue" --output text 2>/dev/null)
-    KB_ID=$(aws cloudformation describe-stacks --stack-name ${STACK_PREFIX}Infrastructure --query "Stacks[0].Outputs[?OutputKey=='KnowledgeBaseId'].OutputValue" --output text 2>/dev/null)
-    DS_ID=$(aws cloudformation describe-stacks --stack-name ${STACK_PREFIX}Infrastructure --query "Stacks[0].Outputs[?OutputKey=='DataSourceId'].OutputValue" --output text 2>/dev/null)
-    
-    echo "다음 단계: KB 문서를 S3에 업로드하고 동기화하세요."
+
+    # 스택 출력 조회
+    KB_BUCKET=$(aws cloudformation describe-stacks --stack-name ${STACK_PREFIX}Infrastructure \
+        --query "Stacks[0].Outputs[?OutputKey=='KBBucketName'].OutputValue" --output text 2>/dev/null)
+    KB_ID=$(aws cloudformation describe-stacks --stack-name ${STACK_PREFIX}Infrastructure \
+        --query "Stacks[0].Outputs[?OutputKey=='KnowledgeBaseId'].OutputValue" --output text 2>/dev/null)
+    DS_ID=$(aws cloudformation describe-stacks --stack-name ${STACK_PREFIX}Infrastructure \
+        --query "Stacks[0].Outputs[?OutputKey=='DataSourceId'].OutputValue" --output text 2>/dev/null)
+    UI_URL=$(aws cloudformation describe-stacks --stack-name ${STACK_PREFIX}UI \
+        --query "Stacks[0].Outputs[?OutputKey=='InternalURL'].OutputValue" --output text 2>/dev/null)
+
+    echo "📋 배포 정보:"
+    echo "  KB S3 버킷: $KB_BUCKET"
+    echo "  KB ID: $KB_ID"
+    echo "  UI URL (Internal): $UI_URL"
     echo ""
-    echo "1. 로컬 KB를 S3에 동기화:"
+    echo "📌 다음 단계:"
+    echo ""
+    echo "1. KB 문서를 S3에 업로드:"
     echo "   aws s3 sync knowledge-base/ s3://$KB_BUCKET/knowledge-base/"
     echo ""
-    echo "2. KB 동기화 (Ingestion Job) 실행:"
+    echo "2. KB Ingestion 실행:"
     echo "   aws bedrock-agent start-ingestion-job \\"
     echo "     --knowledge-base-id $KB_ID \\"
     echo "     --data-source-id $DS_ID \\"
     echo "     --region $REGION"
+    echo ""
+    echo "3. UI 접속 (SSM 포트포워딩):"
+    echo "   # 클러스터/태스크 정보 조회 후:"
+    echo "   aws ssm start-session \\"
+    echo "     --target ecs:<cluster>_<task-id>_<container-runtime-id> \\"
+    echo "     --document-name AWS-StartPortForwardingSession \\"
+    echo "     --parameters '{\"portNumber\":[\"8000\"],\"localPortNumber\":[\"8000\"]}'"
+    echo "   # 브라우저에서 http://localhost:8000 접속"
     echo ""
     echo "=========================================="
 else

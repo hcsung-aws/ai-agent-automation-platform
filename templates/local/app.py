@@ -1,19 +1,35 @@
 """AIOps 스타터 킷 - Chainlit UI.
 
 이 파일은 Supervisor Agent와 대화하는 웹 UI를 제공합니다.
+
+동작 모드 (환경변수로 자동 전환):
+- 로컬 모드: AGENT_RUNTIME_ARN 미설정 → Agent 직접 호출
+- API 모드:  AGENT_RUNTIME_ARN 설정 → AgentCore API 호출
 """
 import asyncio
 import inspect
 import json
+import os
+import uuid
+
 import chainlit as cl
-from strands.hooks import HookProvider, BeforeToolCallEvent, AfterToolCallEvent
-from agents import supervisor as sup_module
-from agents.supervisor import create_supervisor
 from feedback_store import save_feedback
 
+# --- 모드 판별 ---
+AGENT_RUNTIME_ARN = os.environ.get("AGENT_RUNTIME_ARN", "")
+_IS_API_MODE = bool(AGENT_RUNTIME_ARN)
 
-class ToolCallTracker(HookProvider):
-    """Supervisor의 도구 호출을 추적하여 추론 과정을 기록."""
+# --- 로컬 모드 전용 import ---
+if not _IS_API_MODE:
+    from strands.hooks import HookProvider, BeforeToolCallEvent, AfterToolCallEvent
+    from agents import supervisor as sup_module
+    from agents.supervisor import create_supervisor
+
+
+# === 로컬 모드: ToolCallTracker ===
+
+class ToolCallTracker:
+    """Supervisor의 도구 호출을 추적하여 추론 과정을 기록 (로컬 모드 전용)."""
 
     def __init__(self):
         self.calls = []
@@ -36,10 +52,59 @@ class ToolCallTracker(HookProvider):
         self.calls = []
 
 
-# Supervisor 인스턴스
+# --- 인스턴스 ---
 supervisor = None
-_tracker = ToolCallTracker()
+_tracker = ToolCallTracker() if not _IS_API_MODE else None
 
+
+# === API 모드: AgentCore 호출 ===
+
+_agentcore_client = None
+
+
+def _get_agentcore_client():
+    global _agentcore_client
+    if _agentcore_client is None:
+        import boto3
+        _agentcore_client = boto3.client(
+            "bedrock-agentcore",
+            region_name=os.environ.get("BEDROCK_REGION", "us-east-1"),
+        )
+    return _agentcore_client
+
+
+def _invoke_agentcore(prompt: str, session_id: str) -> str:
+    """AgentCore Runtime API 호출."""
+    client = _get_agentcore_client()
+    response = client.invoke_agent_runtime(
+        agentRuntimeArn=AGENT_RUNTIME_ARN,
+        runtimeSessionId=session_id,
+        payload=json.dumps({"prompt": prompt}).encode(),
+    )
+
+    content_type = response.get("contentType", "")
+
+    if "text/event-stream" in content_type:
+        # Streaming 응답
+        parts = []
+        for line in response["response"].iter_lines(chunk_size=10):
+            if line:
+                decoded = line.decode("utf-8")
+                if decoded.startswith("data: "):
+                    parts.append(decoded[6:])
+        return "\n".join(parts)
+    elif content_type == "application/json":
+        # JSON 응답
+        chunks = []
+        for chunk in response.get("response", []):
+            chunks.append(chunk.decode("utf-8"))
+        return json.loads("".join(chunks)).get("response", "".join(chunks))
+    else:
+        # 기타
+        return str(response.get("response", ""))
+
+
+# === 공통 함수 ===
 
 def _format_reasoning(calls):
     """도구 호출 기록을 처리 과정 요약 + 상세 내용 마크다운으로 변환."""
@@ -70,32 +135,57 @@ def _format_reasoning(calls):
 
 
 def _init_supervisor():
-    """Supervisor를 생성하고 ToolCallTracker를 연결."""
+    """Supervisor를 생성하고 ToolCallTracker를 연결 (로컬 모드 전용)."""
     global supervisor
+    if _IS_API_MODE:
+        return
     supervisor = create_supervisor()
     supervisor.hooks.add_hook(_tracker)
 
 
-@cl.on_chat_start
-async def start():
-    """채팅 시작 시 Supervisor 초기화."""
-    _init_supervisor()
-    cl.user_session.set("messages", {})
-    cl.user_session.set("awaiting_feedback_comment", False)
-
-    await cl.Message(content=_build_welcome()).send()
+async def _call_agent(prompt: str, session_id: str) -> tuple[str, str]:
+    """Agent 호출. 반환: (응답 텍스트, 추론 과정 마크다운)."""
+    if _IS_API_MODE:
+        response = await asyncio.to_thread(_invoke_agentcore, prompt, session_id)
+        return response, ""
+    else:
+        _tracker.reset()
+        response = await asyncio.to_thread(supervisor, prompt)
+        return str(response), _format_reasoning(_tracker.calls)
 
 
 def _build_welcome() -> str:
-    """supervisor.py의 ask_*_agent 도구를 감지하여 환영 메시지를 동적 생성."""
-    lines = ["🚀 **AIOps 스타터 킷에 오신 것을 환영합니다!**\n\n현재 등록된 Agent:"]
-    for name, obj in inspect.getmembers(sup_module, predicate=inspect.isfunction):
-        if name.startswith("ask_") and name.endswith("_agent"):
-            doc = (obj.__doc__ or "").strip().split("\n")[0]
-            display = name.replace("ask_", "").replace("_agent", "").replace("_", " ").title()
-            lines.append(f"- **{display} Agent**: {doc}")
-    lines.append("\nSupervisor가 적절한 Agent에게 질문을 전달합니다.")
-    return "\n".join(lines)
+    """환영 메시지 생성."""
+    if _IS_API_MODE:
+        # API 모드: 환경변수에서 Agent 목록 읽기
+        agent_names = os.environ.get("AGENT_NAMES", "Guide")
+        lines = ["🚀 **AIOps 스타터 킷에 오신 것을 환영합니다!** (AWS 모드)\n\n등록된 Agent:"]
+        for name in agent_names.split(","):
+            lines.append(f"- **{name.strip()} Agent**")
+        lines.append("\nSupervisor가 적절한 Agent에게 질문을 전달합니다.")
+        return "\n".join(lines)
+    else:
+        # 로컬 모드: supervisor.py에서 동적 감지
+        lines = ["🚀 **AIOps 스타터 킷에 오신 것을 환영합니다!**\n\n현재 등록된 Agent:"]
+        for name, obj in inspect.getmembers(sup_module, predicate=inspect.isfunction):
+            if name.startswith("ask_") and name.endswith("_agent"):
+                doc = (obj.__doc__ or "").strip().split("\n")[0]
+                display = name.replace("ask_", "").replace("_agent", "").replace("_", " ").title()
+                lines.append(f"- **{display} Agent**: {doc}")
+        lines.append("\nSupervisor가 적절한 Agent에게 질문을 전달합니다.")
+        return "\n".join(lines)
+
+
+# === Chainlit 이벤트 핸들러 ===
+
+@cl.on_chat_start
+async def start():
+    """채팅 시작 시 초기화."""
+    _init_supervisor()
+    cl.user_session.set("session_id", str(uuid.uuid4()))
+    cl.user_session.set("messages", {})
+    cl.user_session.set("awaiting_feedback_comment", False)
+    await cl.Message(content=_build_welcome()).send()
 
 
 @cl.on_message
@@ -108,13 +198,13 @@ async def main(message: cl.Message):
         await _handle_feedback_comment(message)
         return
 
-    if supervisor is None:
+    if not _IS_API_MODE and supervisor is None:
         _init_supervisor()
 
-    _tracker.reset()
-    response = await asyncio.to_thread(supervisor, message.content)
+    session_id = cl.user_session.get("session_id", str(uuid.uuid4()))
+    response_text, reasoning = await _call_agent(message.content, session_id)
 
-    content = str(response) + _format_reasoning(_tracker.calls)
+    content = response_text + reasoning
     msg_id = cl.user_session.get("_msg_counter", 0)
     cl.user_session.set("_msg_counter", msg_id + 1)
     mid = f"msg-{msg_id}"
@@ -126,11 +216,10 @@ async def main(message: cl.Message):
     msg = cl.Message(content=content, actions=actions)
     await msg.send()
 
-    # 피드백용 대화 쌍 + 메시지 객체 저장
     messages = cl.user_session.get("messages", {})
     messages[mid] = {
         "user_input": message.content,
-        "agent_response": str(response),
+        "agent_response": response_text,
         "msg": msg,
     }
     cl.user_session.set("messages", messages)

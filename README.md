@@ -84,53 +84,61 @@ kiro chat --agent agent-builder
 
 #### Template UI 기능
 - **추론 과정 표시**: Strands Hooks로 도구 호출 자동 캡처 → 처리 과정 + 상세 보기
-- **피드백 버튼**: 👍/👎 cl.Action 버튼 → 로컬 JSON 저장 (AWS 시 DynamoDB)
+- **피드백 버튼**: 👍/👎 cl.Action 버튼 → 로컬 JSON 저장 (AWS 시 S3)
 - **동적 환영 메시지**: supervisor.py의 ask_*_agent 도구 자동 감지
 ```
 
-### AWS 배포 (AgentCore)
+### AWS 배포 (Hybrid Architecture)
 
 ```
 ┌─ AIOpsInfrastructure Stack ─────────────────────────────┐
 │                                                         │
 │  ┌─────────┐  ┌─────────────┐  ┌───────────────────┐   │
 │  │ ECR     │  │ KMS         │  │ CloudWatch Logs   │   │
-│  │ (Agent  │  │ (암호화 키, │  │ (KMS 암호화,      │   │
-│  │ 이미지) │  │  키 로테이션)│  │  1개월 보관)      │   │
-│  └────┬────┘  └──────┬──────┘  └───────────────────┘   │
-│       │              │                                  │
-│  ┌────▼──────────────▼──────────────────────────────┐   │
-│  │ IAM Roles                                        │   │
-│  │  ├── AgentCore Runtime Role (Bedrock, S3, Logs)  │   │
-│  │  └── Agent Builder Role (ECR, S3, Bedrock Agent) │   │
+│  │ (Agent  │  │ (암호화 키) │  │ (1개월 보관)      │   │
+│  │ 이미지) │  └──────┬──────┘  └───────────────────┘   │
+│  └────┬────┘         │                                  │
+│       │    ┌─────────▼──────────────────────────────┐   │
+│       │    │ Bedrock KB (자동 생성)                  │   │
+│       │    │  S3 Vectors + Titan Embeddings V2      │   │
+│       │    │  S3 → SQS → Lambda 자동 Sync           │   │
+│       │    └────────────────────────────────────────┘   │
+│       │                                                 │
+│  ┌────▼─────────────────────────────────────────────┐   │
+│  │ S3 KB 버킷 + DynamoDB 피드백 + IAM Roles         │   │
 │  └──────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────┘
 
 ┌─ AIOpsAgentCore Stack ──────────────────────────────────┐
 │                                                         │
 │  ┌──────────────────────────────────────────────────┐   │
-│  │ AgentCore Runtime (ARM64 컨테이너)               │   │
+│  │ AgentCore Runtime (ARM64)                        │   │
 │  │  ┌────────────────────────────────────────────┐  │   │
 │  │  │ Supervisor Agent                           │  │   │
 │  │  │   └── Guide Agent                         │  │   │
 │  │  │        └── KB 검색 (Bedrock KB → S3 → 로컬)│  │   │
 │  │  └────────────────────────────────────────────┘  │   │
-│  │  POST /invocations  │  GET /ping                 │   │
-│  └─────────┬───────────┘────────────────────────────┘   │
-│            │                                            │
-│  ┌─────────▼─────────┐  ┌──────────────────────────┐   │
+│  │  POST /invocations :8080  │  GET /ping           │   │
+│  └──────────────────────────────────────────────────┘   │
+│                                                         │
+│  ┌───────────────────┐  ┌──────────────────────────┐   │
 │  │ Amazon Bedrock     │  │ AgentCore Memory         │   │
 │  │ Claude 3.5 Sonnet  │  │ (대화 컨텍스트 유지)     │   │
 │  └───────────────────┘  └──────────────────────────┘   │
+└─────────────────────────────────────────────────────────┘
+
+┌─ AIOpsUI Stack ─────────────────────────────────────────┐
 │                                                         │
 │  ┌──────────────────────────────────────────────────┐   │
-│  │ S3 (Knowledge Base)                              │   │
-│  │  knowledge-base/                                 │   │
-│  │   ├── common/*.md                                │   │
-│  │   ├── devops/*.md                                │   │
-│  │   └── monitoring/*.md                            │   │
-│  │  → Bedrock KB 데이터 소스로 연결 가능 (선택)     │   │
+│  │ ECS Fargate + Internal ALB                       │   │
+│  │  ┌────────────────────────────────────────────┐  │   │
+│  │  │ Chainlit UI (app.py :8000)                 │  │   │
+│  │  │   → boto3.invoke_agent_runtime()           │  │   │
+│  │  │   → AgentCore API 호출                     │  │   │
+│  │  │   → 👍👎 피드백 → S3 저장                  │  │   │
+│  │  └────────────────────────────────────────────┘  │   │
 │  └──────────────────────────────────────────────────┘   │
+│  SSM 포트포워딩으로 접속 (Internal ALB)                 │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -237,9 +245,11 @@ aiops-starter-kit/
 ├── templates/
 │   ├── local/                    # 로컬 배포 템플릿
 │   │   ├── setup.sh             # 원클릭 설치
-│   │   ├── app.py               # Chainlit UI
+│   │   ├── app.py               # Chainlit UI (로컬: 직접 호출, AWS: AgentCore API)
 │   │   ├── config.py            # 모델/리전 설정
-│   │   ├── feedback_store.py    # 피드백 저장 (로컬 JSON, AWS시 DynamoDB)
+│   │   ├── feedback_store.py    # 피드백 저장 (로컬 JSON / DynamoDB / S3)
+│   │   ├── Dockerfile.ui        # UI 전용 컨테이너 (Fargate 배포용)
+│   │   ├── requirements-ui.txt  # UI 의존성
 │   │   ├── agent-builder.json   # Kiro CLI Agent Builder
 │   │   ├── review-agent.json    # Kiro CLI Review Agent
 │   │   ├── deployment-agent.json # Kiro CLI Deployment Agent
@@ -249,15 +259,16 @@ aiops-starter-kit/
 │   │       ├── mcp_agent.py     # MCP 연동 예시 Agent
 │   │       ├── case_tools.py    # 사례 저장 도구
 │   │       ├── main.py          # AgentCore HTTP 서버
-│   │       ├── Dockerfile       # 컨테이너 빌드
+│   │       ├── Dockerfile       # AgentCore 컨테이너 (ARM64)
 │   │       └── requirements.txt # Agent 의존성
 │   │
-│   └── aws/                      # AWS 배포 템플릿
-│       ├── deploy.sh            # 배포 스크립트
+│   └── aws/                      # AWS 배포 템플릿 (Hybrid Architecture)
+│       ├── deploy.sh            # 3개 스택 배포 스크립트
 │       └── cdk/
 │           └── stacks/
-│               ├── infrastructure_stack.py  # ECR, IAM, KMS
-│               └── agentcore_stack.py       # Runtime, Gateway, Memory
+│               ├── infrastructure_stack.py  # ECR, IAM, KMS, KB, S3 Vectors
+│               ├── agentcore_stack.py       # Runtime, Memory
+│               └── ui_stack.py              # Fargate + Chainlit UI
 │
 ├── knowledge-base/               # 로컬 Knowledge Base
 │   ├── common/                  # 공통 지식

@@ -12,6 +12,7 @@
     "file://context_rule/agent-builder-guide.md",
     "file://docs/deployment-guide.md",
     "file://templates/aws/deploy.sh",
-    "file://templates/aws/cdk/stacks/infrastructure_stack.py"
+    "file://templates/aws/cdk/stacks/infrastructure_stack.py",
+    "file://templates/aws/cdk/stacks/ui_stack.py"
   ]
 }

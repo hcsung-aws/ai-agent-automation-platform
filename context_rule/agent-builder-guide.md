@@ -425,24 +425,44 @@ KB 활용 원칙:
 
 ---
 
-## AWS 배포
+## AWS 배포 (Hybrid Architecture)
+
+### ⚠️ 중요: 독자 CDK 스택 생성 금지
+
+AWS 배포 시 **반드시 `templates/aws/deploy.sh`를 사용**합니다.
+독자적인 CDK 스택(ECS Fargate 단독 등)을 생성하지 마세요.
+
+이유:
+- `deploy.sh`가 KB 자동 생성, 자동 Sync, 피드백 저장소를 포함한 전체 인프라를 관리
+- 독자 스택은 KB/피드백/AgentCore 연동이 누락됨
+
+### 아키텍처 (3개 스택)
+
+```
+deploy.sh → CDK 3개 스택 자동 배포:
+
+1. Infrastructure: ECR, IAM, KMS, KB (S3 Vectors + Bedrock KB), DynamoDB, 자동 Sync
+2. AgentCore: Supervisor + Agents (POST /invocations :8080)
+3. UI: Fargate + Chainlit (app.py → AgentCore API 호출)
+```
 
 ### 프로젝트 구조 (Docker 빌드 관점)
 
 ```
 templates/local/          ← Docker build context
-├── config.py             ← COPY config.py . (Dockerfile에서 복사)
-├── .dockerignore         ← 불필요 파일 제외
+├── config.py             ← 공유 설정 (MODEL_ID, REGION_NAME)
+├── app.py                ← Chainlit UI (로컬: 직접 호출, AWS: AgentCore API)
+├── feedback_store.py     ← 피드백 (local JSON / DynamoDB / S3)
+├── Dockerfile.ui         ← UI 전용 컨테이너 (Fargate용)
+├── requirements-ui.txt   ← UI 의존성 (chainlit, boto3)
+├── .dockerignore
 ├── agents/
-│   ├── Dockerfile        ← from_asset(local/, file="agents/Dockerfile")
+│   ├── Dockerfile        ← AgentCore 컨테이너 (ARM64)
 │   ├── main.py           ← AgentCore HTTP 엔트리포인트
 │   ├── supervisor.py
 │   ├── guide_agent.py
 │   └── requirements.txt
 ```
-
-- build context가 `templates/local/`이므로 config.py가 자동 포함됨
-- `from config import MODEL_ID, REGION_NAME`이 Docker 컨테이너에서도 동작
 
 ### 새 Agent 추가 후 AWS 재배포
 
@@ -453,7 +473,10 @@ templates/local/          ← Docker build context
    ```bash
    cd templates/aws && ./deploy.sh
    ```
-   CDK가 자동으로 Docker 빌드 → ECR 푸시 → Runtime 업데이트
+   CDK가 자동으로:
+   - Agent 코드 → Docker 빌드 → AgentCore Runtime 업데이트
+   - UI 코드 → Docker 빌드 → Fargate 업데이트
+   - KB, 피드백 등 인프라는 변경 없으면 스킵
 
 ### 커스텀 프로젝트 배포
 
@@ -461,5 +484,7 @@ templates/local/          ← Docker build context
 ```bash
 cd templates/aws && ./deploy.sh /path/to/my-project
 ```
-- `/path/to/my-project/` 안에 `agents/` 디렉토리와 `config.py`가 있어야 함
-- `agents/Dockerfile`, `agents/main.py` 필수
+필수 파일:
+- `agents/Dockerfile`, `agents/main.py`, `agents/supervisor.py`
+- `config.py`, `app.py`, `feedback_store.py`
+- `Dockerfile.ui`, `requirements-ui.txt`
