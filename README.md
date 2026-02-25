@@ -86,7 +86,6 @@ kiro chat --agent agent-builder
 - **추론 과정 표시**: Strands Hooks로 도구 호출 자동 캡처 → 처리 과정 + 상세 보기
 - **피드백 버튼**: 👍/👎 cl.Action 버튼 → 로컬 JSON 저장 (AWS 시 S3)
 - **동적 환영 메시지**: supervisor.py의 ask_*_agent 도구 자동 감지
-```
 
 ### AWS 배포 (Hybrid Architecture)
 
