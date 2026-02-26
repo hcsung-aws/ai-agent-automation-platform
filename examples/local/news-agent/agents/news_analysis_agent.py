@@ -1,12 +1,10 @@
 """News Analysis Agent - 저장된 뉴스 데이터 분석."""
 import json
-from pathlib import Path
 
 from strands import Agent, tool
 from strands.models import BedrockModel
 from config import MODEL_ID, REGION_NAME
-
-NEWS_DIR = Path("news-data")
+from news_store import load_news, list_dates
 
 
 @tool
@@ -16,15 +14,10 @@ def list_available_dates() -> str:
     Returns:
         날짜별 기사 수 목록
     """
-    if not NEWS_DIR.exists():
+    dates = list_dates()
+    if not dates:
         return "저장된 뉴스가 없습니다. 먼저 뉴스 크롤링 Agent로 뉴스를 수집하세요."
-    files = sorted(NEWS_DIR.glob("*.json"), reverse=True)
-    if not files:
-        return "저장된 뉴스가 없습니다."
-    lines = []
-    for f in files:
-        count = len(json.loads(f.read_text("utf-8")))
-        lines.append(f"• {f.stem} — {count}건")
+    lines = [f"• {d['date']} — {d['count']}건" for d in dates]
     return "\n".join(lines)
 
 
@@ -38,10 +31,9 @@ def load_news_data(date_str: str) -> str:
     Returns:
         JSON 형태의 뉴스 데이터
     """
-    path = NEWS_DIR / f"{date_str}.json"
-    if not path.exists():
+    articles = load_news(date_str)
+    if articles is None:
         return f"{date_str}에 저장된 뉴스가 없습니다."
-    articles = json.loads(path.read_text("utf-8"))
     return json.dumps(articles, ensure_ascii=False)
 
 

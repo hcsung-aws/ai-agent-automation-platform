@@ -20,6 +20,20 @@
 └─────────────────────────────────────────────────────────────┘
 ```
 
+> ### 📖 이 프로젝트는 **학습용**입니다
+>
+> 이 프로젝트는 Agentic AIOps를 빠르게 시작하고 개선해 나가는 방법에 대한 **아이디어를 얻기 위한 학습 자료**입니다.
+>
+> **왜 학습용인가요?**
+>
+> 1. **AI 기술은 매우 빠르게 발전합니다.** 이 프로젝트의 내용을 참고하여 구현하더라도, 곧 더 나은 기술과 방법이 등장할 수 있습니다. 특정 구현에 고정되기보다 변화에 유연하게 대응하는 것이 중요합니다.
+>
+> 2. **이 프로젝트가 추구하는 방향:**
+>    - 내부에서 **빠르게 아이디어를 검증**하면서 AI Agent 활용 방법을 파악하는 것
+>    - 간단한 아이디어나 반복 작업에 **AI를 빠르게 적용**하여 업무 효율을 높이는 것
+>
+> 즉, 이 프로젝트의 내용을 그대로 따라 하라는 것이 아니라, **"AI Agent로 이런 것도 할 수 있구나"** 하는 감각을 익히고, 각자의 환경에 맞게 응용하시길 바랍니다.
+
 ---
 
 ## 🚀 빠른 시작
@@ -27,8 +41,8 @@
 ### 로컬 환경 (5분)
 
 ```bash
-git clone https://github.com/your-org/aiops-starter-kit.git
-cd aiops-starter-kit/templates/local
+git clone https://github.com/hcsung-aws/ai-agent-automation-platform.git
+cd ai-agent-automation-platform/templates/local
 ./setup.sh
 source .venv/bin/activate
 chainlit run app.py --port 8000
@@ -476,6 +490,12 @@ chainlit run app.py
 
 ---
 
+## 🤖 이 프로젝트는 AI와 함께 만들었습니다
+
+이 프로젝트는 [ai-developer-mickey](https://github.com/hcsung-aws/ai-developer-mickey) 시스템 프롬프트를 활용하여 AI 개발 에이전트와 협업하며 만들었습니다. 세션 간 컨텍스트 유지, 지식 누적, 점진적 개선 등의 방법론이 적용되어 있습니다.
+
+---
+
 ## 라이선스
 
 MIT License
@@ -487,6 +507,20 @@ MIT License
 ## What is this project?
 
 **A platform for creating AI Agents with natural language and improving them incrementally.**
+
+> ### 📖 This project is for **learning purposes**
+>
+> This project is a **learning resource** for getting ideas on how to quickly start and improve Agentic AIOps.
+>
+> **Why is it for learning?**
+>
+> 1. **AI technology evolves extremely fast.** Even if you build something based on this project, better technologies and approaches may emerge soon. It's more important to stay flexible than to lock into a specific implementation.
+>
+> 2. **What this project aims for:**
+>    - **Quickly validate ideas** internally to understand how AI Agents can be utilized
+>    - **Rapidly apply AI** to simple ideas and repetitive tasks to improve work efficiency
+>
+> In other words, this project is not meant to be followed exactly as-is. Rather, it's about developing a sense of **"Oh, AI Agents can do this too!"** and adapting it to your own environment.
 
 Key features:
 - **No-code Agent creation**: Request Agent Builder in natural language

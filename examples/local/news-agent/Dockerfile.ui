@@ -1,0 +1,14 @@
+# Chainlit UI 전용 컨테이너 (Fargate 배포용)
+# Agent 코드 불포함 — AgentCore API를 통해 Agent 호출
+# Build context: templates/local/
+FROM python:3.11-slim
+
+WORKDIR /app
+
+COPY requirements-ui.txt .
+RUN pip install --no-cache-dir -r requirements-ui.txt
+
+COPY app.py config.py feedback_store.py ./
+
+EXPOSE 8000
+CMD ["chainlit", "run", "app.py", "--host", "0.0.0.0", "--port", "8000"]

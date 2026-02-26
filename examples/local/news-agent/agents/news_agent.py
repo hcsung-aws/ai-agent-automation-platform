@@ -1,12 +1,11 @@
 """News Agent - RSS 기반 뉴스 크롤링, 날짜별 저장 및 조회."""
-import json
 from datetime import date
-from pathlib import Path
 
 import feedparser
 from strands import Agent, tool
 from strands.models import BedrockModel
 from config import MODEL_ID, REGION_NAME
+from news_store import save_news, load_news, list_dates
 
 RSS_FEEDS = {
     "연합뉴스": "https://www.yonhapnewstv.co.kr/browse/feed/",
@@ -14,27 +13,6 @@ RSS_FEEDS = {
     "TechCrunch": "https://techcrunch.com/feed/",
     "AWS News": "https://aws.amazon.com/blogs/aws/feed/",
 }
-
-NEWS_DIR = Path("news-data")
-
-
-def _save_news(date_str: str, articles: list[dict]) -> None:
-    """뉴스 데이터를 JSON 파일로 저장합니다."""
-    NEWS_DIR.mkdir(exist_ok=True)
-    path = NEWS_DIR / f"{date_str}.json"
-    # 기존 파일이 있으면 병합
-    existing = json.loads(path.read_text("utf-8")) if path.exists() else []
-    existing_links = {a["link"] for a in existing}
-    merged = existing + [a for a in articles if a["link"] not in existing_links]
-    path.write_text(json.dumps(merged, ensure_ascii=False, indent=2), "utf-8")
-
-
-def _load_news(date_str: str) -> list[dict] | None:
-    """저장된 뉴스 데이터를 로드합니다. 없으면 None."""
-    path = NEWS_DIR / f"{date_str}.json"
-    if path.exists():
-        return json.loads(path.read_text("utf-8"))
-    return None
 
 
 def _format_articles(articles: list[dict]) -> str:
@@ -61,7 +39,7 @@ def fetch_news(source: str = "", max_items: int = 5) -> str:
     today = date.today().isoformat()
 
     # 캐시 확인
-    cached = _load_news(today)
+    cached = load_news(today)
     if cached:
         if source:
             cached = [a for a in cached if a["source"] == source]
@@ -84,7 +62,7 @@ def fetch_news(source: str = "", max_items: int = 5) -> str:
         except Exception as e:
             articles.append({"source": name, "title": f"피드 로드 실패: {e}", "link": "", "summary": "", "published": ""})
 
-    _save_news(today, articles)
+    save_news(today, articles)
     return f"[크롤링 완료 - {today}에 저장됨]\n\n" + _format_articles(articles)
 
 
@@ -115,7 +93,7 @@ def search_news(keyword: str, max_items: int = 5) -> str:
 
     # 검색 결과도 오늘 날짜로 저장
     if articles:
-        _save_news(date.today().isoformat(), articles)
+        save_news(date.today().isoformat(), articles)
 
     return _format_articles(articles) if articles else f"'{keyword}' 관련 뉴스를 찾지 못했습니다."
 
@@ -127,17 +105,11 @@ def list_saved_news() -> str:
     Returns:
         날짜별 저장된 뉴스 파일 목록과 기사 수
     """
-    if not NEWS_DIR.exists():
+    dates = list_dates()
+    if not dates:
         return "저장된 뉴스가 없습니다. fetch_news로 먼저 뉴스를 수집하세요."
 
-    files = sorted(NEWS_DIR.glob("*.json"), reverse=True)
-    if not files:
-        return "저장된 뉴스가 없습니다."
-
-    lines = []
-    for f in files:
-        articles = json.loads(f.read_text("utf-8"))
-        lines.append(f"• {f.stem} — {len(articles)}건")
+    lines = [f"• {d['date']} — {d['count']}건" for d in dates]
     return "📁 저장된 뉴스 목록:\n" + "\n".join(lines)
 
 
@@ -151,7 +123,7 @@ def load_news_by_date(date_str: str) -> str:
     Returns:
         해당 날짜의 뉴스 목록
     """
-    articles = _load_news(date_str)
+    articles = load_news(date_str)
     if articles is None:
         return f"{date_str}에 저장된 뉴스가 없습니다."
     return f"📰 {date_str} 뉴스 ({len(articles)}건):\n\n" + _format_articles(articles)

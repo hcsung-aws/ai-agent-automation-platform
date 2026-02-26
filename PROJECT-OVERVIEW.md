@@ -46,14 +46,12 @@ AIOps 스타터 킷 - AI Agent 기반 운영 자동화 플랫폼
 - [x] QUICKSTART 문서 (로컬/AWS)
 
 ## Current Status
-- Session: Mickey 24
-- Progress: v1.8 KB 자동 생성 + Sync ✅ 완료
-- AWS 배포: ✅ E2E 검증 완료 (us-east-1)
+- Session: Mickey 25
+- Progress: v1.9 Hybrid Architecture ✅ 완료
+- AWS 배포: 기존 인프라 정리 완료, E2E 재배포 테스트 대기
 - 로컬 환경: ✅ 동작 확인
-- 테스트: ✅ 15/15 통과
-- 문서: ✅ QUICKSTART x2, TUTORIAL x3, BEST-PRACTICES, TROUBLESHOOTING
-- 사례 학습: ✅ save_case 도구 + 피드백 기반 사례 제안 (로컬)
-- 리팩토링: ✅ 모델 ID 10곳 + region 20곳 → config/환경변수 추출 완료
+- 테스트: ✅ 15/15 통과, CDK synth 3개 스택 통과
+- 문서: ✅ QUICKSTART x2, TUTORIAL x5, BEST-PRACTICES, TROUBLESHOOTING
 
 ## Roadmap
 
@@ -67,6 +65,7 @@ v1.5 MCP 연동 지원          ████████████ 100% ✅
 v1.6 Template UI 개선       ████████████ 100% ✅
 v1.7 AWS 배포 기반+매뉴얼   ████████████ 100% ✅
 v1.8 KB 자동 생성+Sync      ████████████ 100% ✅
+v1.9 Hybrid Architecture    ████████████ 100% ✅
 v2.0 스케줄러/알림           ░░░░░░░░░░░░   0%
 ```
 

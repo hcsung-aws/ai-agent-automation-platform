@@ -63,6 +63,7 @@ class AgentCoreStack(Stack):
                 "LOCAL_KB_PATH": "/app/knowledge-base",
                 "FEEDBACK_STORAGE": "dynamodb",
                 "FEEDBACK_TABLE": feedback_table.table_name,
+                "NEWS_S3_BUCKET": kb_bucket.bucket_name,  # KB 버킷 재사용
             },
         )
         

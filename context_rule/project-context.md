@@ -258,5 +258,15 @@ AWS_REGION=us-east-1 aws logs filter-log-events \
 - Solution: nonFilterableMetadataKeys에 "AMAZON_BEDROCK_TEXT", "AMAZON_BEDROCK_METADATA" 추가
 - Rule: Bedrock KB + S3 Vectors 조합 시 CfnIndex에 메타데이터 키 설정 필수
 
+### Mickey 25: AgentCore는 API 전용 — 웹 UI는 별도 Fargate 필요
+- Problem: AgentCore Runtime은 POST /invocations + GET /ping만 지원 (:8080), Chainlit 웹 UI 서빙 불가
+- Solution: Hybrid Architecture — Fargate(Chainlit UI) + AgentCore(Agents) 분리
+- Rule: app.py에서 AGENT_RUNTIME_ARN 환경변수로 로컬/API 모드 자동 전환
+
+### Mickey 25: agent-builder 독자 CDK 스택 생성 금지
+- Problem: agent-builder가 E2E 테스트 시 Fargate 독자 스택 생성 → template/aws의 KB 자동 생성 우회
+- Solution: agent-builder-guide.md에 독자 스택 금지 명시, 항상 deploy.sh 사용
+- Rule: AWS 배포는 반드시 templates/aws/deploy.sh 경유
+
 ## Last Updated
-Mickey 23 - 2026-02-21
+Mickey 25 - 2026-02-24
