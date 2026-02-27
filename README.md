@@ -155,6 +155,12 @@ kiro chat --agent agent-builder
 └─────────────────────────────────────────────────────────┘
 ```
 
+```bash
+# UI 접속 (SSM 포트포워딩)
+./scripts/ssm-port-forward.sh us-west-2 8000
+# → http://localhost:8000 으로 접속
+```
+
 ### KB 검색 폴백 체인
 
 ```
@@ -292,6 +298,9 @@ aiops-starter-kit/
 ├── src/                          # PoC 구현 (게임 운영 시나리오, 참고용)
 │   ├── agent/                   # Agent 구현 예시
 │   └── tools/                   # 도구 구현 예시
+│
+├── scripts/                      # 유틸리티 스크립트
+│   └── ssm-port-forward.sh     # SSM 포트포워딩 (ECS UI 접속)
 │
 ├── tests/                        # 테스트
 │   ├── test_kb_tools.py         # KB 도구 테스트
