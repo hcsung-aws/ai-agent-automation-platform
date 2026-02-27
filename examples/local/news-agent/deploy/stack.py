@@ -67,7 +67,7 @@ class NewsAgentStack(Stack):
                 ),
                 container_port=8000,
                 environment={
-                    "BEDROCK_MODEL_ID": "us.anthropic.claude-3-5-sonnet-20241022-v2:0",
+                    "BEDROCK_MODEL_ID": "us.anthropic.claude-sonnet-4-6",
                     "BEDROCK_REGION": "us-east-1",
                     "FEEDBACK_STORAGE": "s3",
                     "FEEDBACK_BUCKET": feedback_bucket.bucket_name,
