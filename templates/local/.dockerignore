@@ -3,8 +3,10 @@ __pycache__/
 *.pyc
 .env
 .env.example
-knowledge-base/
-*.json
-app.py
+.git/
 setup.sh
-feedback_store.py
+docker-compose.yml
+Dockerfile.*
+*.md
+*.json
+feedback.json

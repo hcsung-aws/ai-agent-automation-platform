@@ -1,0 +1,18 @@
+# 로컬 All-in-One 컨테이너 (Chainlit UI + Supervisor Agent)
+# AWS 배포 시에는 Dockerfile.ui + agents/Dockerfile을 각각 사용
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# 의존성 설치 (Agent + UI)
+COPY agents/requirements.txt requirements-agents.txt
+COPY requirements-ui.txt .
+RUN pip install --no-cache-dir -r requirements-agents.txt -r requirements-ui.txt
+
+# 코드 복사
+COPY config.py feedback_store.py app.py ./
+COPY agents/ agents/
+COPY knowledge-base/ knowledge-base/
+
+EXPOSE 8000
+CMD ["chainlit", "run", "app.py", "--host", "0.0.0.0", "--port", "8000"]
