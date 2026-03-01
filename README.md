@@ -38,17 +38,22 @@
 
 ## 🚀 빠른 시작
 
-### 로컬 환경 (5분)
+### 로컬 환경 - Docker (권장, 3분)
 
 ```bash
 git clone https://github.com/hcsung-aws/ai-agent-automation-platform.git
 cd ai-agent-automation-platform/templates/local
-./setup.sh
-source .venv/bin/activate
-chainlit run app.py --port 8000
+cp .env.example .env        # 환경변수 설정
+touch feedback.json          # 피드백 저장 파일
+docker compose up -d
 ```
 
 브라우저에서 http://localhost:8000 접속
+
+> Docker 없이 실행하려면 venv 방식을 사용하세요:
+> ```bash
+> ./setup.sh && source .venv/bin/activate && chainlit run app.py --port 8000
+> ```
 
 → [상세 가이드: QUICKSTART-LOCAL.md](docs/QUICKSTART-LOCAL.md)
 
@@ -263,7 +268,9 @@ kiro chat --agent deployment
 aiops-starter-kit/
 ├── templates/
 │   ├── local/                    # 로컬 배포 템플릿
-│   │   ├── setup.sh             # 원클릭 설치
+│   │   ├── docker-compose.yml   # Docker 원클릭 실행 (권장)
+│   │   ├── Dockerfile.local     # 로컬 All-in-One 컨테이너
+│   │   ├── setup.sh             # venv 설치 (Docker 없을 때)
 │   │   ├── app.py               # Chainlit UI (로컬: 직접 호출, AWS: AgentCore API)
 │   │   ├── config.py            # 모델/리전 설정
 │   │   ├── feedback_store.py    # 피드백 저장 (로컬 JSON / DynamoDB / S3)
@@ -540,24 +547,24 @@ Key features:
 
 ## Quick Start
 
-### 1. Setup (10 min)
+### 1. Setup - Docker (Recommended, 3 min)
 
 ```bash
 git clone https://github.com/hcsung-aws/ai-agent-automation-platform.git
-cd ai-agent-automation-platform
-
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
+cd ai-agent-automation-platform/templates/local
+cp .env.example .env
+touch feedback.json
+docker compose up -d
 ```
 
-### 2. Run Sample Agent (5 min)
+Open http://localhost:8000 in your browser.
 
-```bash
-chainlit run app.py --port 8000
-```
+> Without Docker, use venv:
+> ```bash
+> ./setup.sh && source .venv/bin/activate && chainlit run app.py --port 8000
+> ```
 
-### 3. Create Your Own Agent (15 min)
+### 2. Create Your Own Agent
 
 ```bash
 kiro chat --agent agent-builder
