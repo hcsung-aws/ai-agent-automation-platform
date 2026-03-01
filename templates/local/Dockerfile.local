@@ -14,5 +14,6 @@ COPY config.py feedback_store.py app.py ./
 COPY agents/ agents/
 COPY knowledge-base/ knowledge-base/
 
+ENV PYTHONPATH=/app/agents
 EXPOSE 8000
 CMD ["chainlit", "run", "app.py", "--host", "0.0.0.0", "--port", "8000"]
