@@ -409,50 +409,15 @@ pytest tests/ -v
 
 ---
 
-## 프로젝트 구조
+## 📦 PoC 참고: 게임 운영 Agent
 
-```
-ai-agent-platform/
-├── app.py                      # Chainlit UI (PoC용)
-├── logs_api.py                 # 로그/피드백 API (PoC용)
-├── src/                        # PoC 구현 (게임 운영 시나리오)
-│   ├── agent/
-│   │   ├── supervisor_agent.py # Supervisor
-│   │   ├── devops_agent.py     # DevOps Agent (예시)
-│   │   └── analytics_agent.py  # Analytics Agent (예시)
-│   ├── tools/
-│   │   └── *.py                # 도구 모음
-│   └── utils/
-│       └── execution_logger.py # 실행 로그
-├── context_rule/
-│   └── agent-builder-guide.md  # Agent Builder 가이드
-├── docs/                       # 문서
-└── infra/                      # CDK/Terraform
-```
-
----
-
-## PoC 예시: 게임 운영 Agent
-
-이 저장소에는 게임 운영 시나리오의 PoC가 포함되어 있습니다.
+> `src/` 디렉토리에 게임 운영 시나리오의 PoC가 포함되어 있습니다. 이 프로젝트의 출발점이었으며, 현재 템플릿(`templates/`)은 이 PoC의 교훈을 반영하여 재설계한 것입니다.
 
 | Agent | 도구 | 담당 영역 |
 |-------|------|----------|
 | DevOps | 6개 | CloudWatch, EC2, 장애 티켓 |
 | Analytics | 10개 | DAU, 가챠 확률, 재화 흐름 |
-| Godot Review | 5개 | GDScript 코드 리뷰 |
 | Monitoring | 3개 | CloudWatch 알람 현황, 추이 분석, 이슈 리포팅 |
-
-```bash
-# 테스트
-chainlit run app.py
-
-# 질문 예시
-"장애 티켓 목록 보여줘"
-"가챠 등급별 확률 분석해줘"
-"알람 현황 확인해줘"
-"알람 분석해서 이슈 리포팅해줘"
-```
 
 ---
 
@@ -504,6 +469,50 @@ chainlit run app.py
 
 ---
 
+## 💡 개발 교훈
+
+이 프로젝트를 32세션에 걸쳐 AI와 협업하며 개발하면서 얻은 핵심 교훈입니다.
+
+→ [상세 사례: BEST-PRACTICES.md](docs/BEST-PRACTICES.md)
+
+### Agent 설계
+
+| 교훈 | 설명 |
+|------|------|
+| **LLM 응답에 메타데이터를 의존하지 마세요** | LLM은 "중요하지 않다"고 판단한 내용을 생략합니다. 테스트 모드 표시, 상태 플래그 등은 코드 레벨에서 관리하세요. |
+| **도구 설명이 곧 Agent의 판단 기준입니다** | 모호한 docstring은 도구 미호출로 이어집니다. "언제, 왜" 사용하는지 명시하세요. |
+| **Multi-Agent에서 URL/링크가 소실됩니다** | Sub-Agent → Supervisor 2단계 요약 시 URL이 "링크 참고"로 축약됩니다. 각 계층 SYSTEM_PROMPT에 "링크 보존" 원칙을 명시하세요. |
+| **KB 검색은 단어 단위 매칭이 필수입니다** | 전체 문자열 매칭(`query in content`)은 LLM이 생성하는 자연어 query와 매칭 실패합니다. 단어 단위로 분리하여 키워드 매칭하세요. |
+
+### AWS 배포
+
+| 교훈 | 설명 |
+|------|------|
+| **AgentCore Runtime은 HTTP 서버입니다** | Lambda 핸들러가 아닙니다. FastAPI + uvicorn으로 `POST /invocations` + `GET /ping`을 구현하세요. |
+| **AgentCore는 ARM64 전용입니다** | x86_64 이미지로 배포하면 실패합니다. Dockerfile에 `--platform=linux/arm64`를 추가하세요. |
+| **IAM에 inference-profile 권한이 필요합니다** | `foundation-model/*`만 허용하면 AccessDeniedException이 발생합니다. `inference-profile/*`도 추가하세요. |
+| **S3 Vectors가 CDK 자동화에 유리합니다** | OpenSearch Serverless는 vector index가 CloudFormation 미지원이라 Custom Resource Lambda가 필요합니다. |
+| **KMS + CloudWatch Logs는 키 정책 확인 필수** | KMS 키 정책에 CloudWatch Logs 서비스 권한이 없으면 암호화된 LogGroup 생성이 실패합니다. |
+
+### Chainlit UI
+
+| 교훈 | 설명 |
+|------|------|
+| **Strands Agent 호출은 `asyncio.to_thread` 필수** | async 함수 안에서 동기 호출하면 이벤트 루프가 블록되어 WebSocket이 끊깁니다. |
+| **피드백 버튼은 Data Layer 없이 동작하지 않습니다** | `@cl.on_feedback`은 Data Layer가 필요합니다. PoC에서는 `cl.Action` 버튼으로 자체 구현하세요. |
+| **cl.Image는 `content=bytes` 직접 전달이 안정적** | Docker 환경에서 tempfile + path 방식은 파일 서빙 이슈가 발생합니다. |
+| **Python 이중 임포트로 모듈 상태가 공유되지 않습니다** | `media_utils`와 `agents.media_utils`는 별개 인스턴스입니다. PYTHONPATH 경유로 임포트 경로를 통일하세요. |
+
+### 개발 프로세스
+
+| 교훈 | 설명 |
+|------|------|
+| **프로토타입 → 검증 → 병합 사이클을 지키세요** | 새 기능은 `prototypes/`에서 먼저 검증하고, 통과 후 `templates/`에 병합합니다. |
+| **Docker 빌드 시 build context 외부 파일을 확인하세요** | `agents/` 밖의 `config.py` 같은 파일이 누락되면 런타임 import 에러가 발생합니다. |
+| **피드백과 사례는 보완 관계입니다** | 피드백(👍/👎)은 "뭘 고칠지" 신호, 사례는 "어떻게 해결했는지" 지식입니다. 둘 다 필요합니다. |
+
+---
+
 ## 기여 방법
 
 1. 이슈 등록 또는 기존 이슈 확인
@@ -549,6 +558,7 @@ Key features:
 - **No-code Agent creation**: Request Agent Builder in natural language
 - **Incremental improvement**: Auto-improve Agents based on feedback
 - **Multi-Agent collaboration**: Multiple specialist Agents working together
+- **Multimodal output**: Inline rendering of Agent-generated images (charts, metrics)
 
 ---
 
@@ -587,12 +597,13 @@ kiro chat --agent agent-builder
 
 | Document | Description |
 |----------|-------------|
-| [QUICKSTART.md](docs/QUICKSTART.md) | Quick start guide |
+| [QUICKSTART-LOCAL.md](docs/QUICKSTART-LOCAL.md) | Local quick start guide |
+| [QUICKSTART-AWS.md](docs/QUICKSTART-AWS.md) | AWS AgentCore deployment |
 | [TUTORIAL-FIRST-AGENT.md](docs/TUTORIAL-FIRST-AGENT.md) | Create first Agent with natural language |
 | [TUTORIAL-FEEDBACK.md](docs/TUTORIAL-FEEDBACK.md) | Setup feedback loop |
 | [TUTORIAL-MULTI-AGENT.md](docs/TUTORIAL-MULTI-AGENT.md) | Multi-Agent configuration |
 | [BEST-PRACTICES.md](docs/BEST-PRACTICES.md) | Failure cases and lessons |
-| [DEPLOYMENT.md](docs/DEPLOYMENT.md) | AWS deployment guide |
+| [deployment-guide.md](docs/deployment-guide.md) | Agent deployment procedure |
 
 ---
 
