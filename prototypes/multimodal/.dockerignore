@@ -1,0 +1,12 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+.env.example
+.git/
+setup.sh
+docker-compose.yml
+Dockerfile.*
+*.md
+*.json
+feedback.json

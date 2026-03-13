@@ -1,0 +1,13 @@
+services:
+  aiops:
+    build:
+      context: .
+      dockerfile: Dockerfile.local
+    ports:
+      - "8000:8000"
+    env_file: .env
+    volumes:
+      - ~/.aws:/root/.aws:ro
+      - ./knowledge-base:/app/knowledge-base
+      - ./feedback.json:/app/feedback.json
+    restart: unless-stopped
