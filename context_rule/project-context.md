@@ -194,6 +194,17 @@ AWS_REGION=us-east-1 aws logs filter-log-events \
 - Solution: 3계층 SYSTEM_PROMPT에 링크 보존 원칙 명시 (도구→Sub-Agent→Supervisor)
 - Rule: URL/데이터 보존이 필요하면 각 계층 SYSTEM_PROMPT에 명시 필수
 
+### Mickey 31: Python 이중 임포트로 모듈 상태 공유 실패
+- Problem: media_utils._media_queue에 add_image로 추가했는데 flush가 빈 리스트 반환
+- Cause: cloudwatch_agent는 `from media_utils import add_image`, app.py는 `from agents.media_utils import flush` → 별개 모듈 인스턴스
+- Solution: 동일 PYTHONPATH 경로로 통일 (`from media_utils import ...`)
+- Avoid: 같은 모듈을 `pkg.module`과 `module` 두 경로로 임포트
+
+### Mickey 31: Chainlit cl.Image는 content=bytes 직접 전달
+- Problem: cl.Image(path=tempfile) 방식이 Docker에서 이미지 표시 안 됨
+- Solution: cl.Image(content=bytes, display="inline") — tempfile 불필요
+- display="inline"이면 content에 ![name](name) 추가 불필요 (자동 표시)
+
 ## File Locations
 - Source: src/ (예정)
 - Infrastructure: infra/ (예정)
@@ -269,4 +280,4 @@ AWS_REGION=us-east-1 aws logs filter-log-events \
 - Rule: AWS 배포는 반드시 templates/aws/deploy.sh 경유
 
 ## Last Updated
-Mickey 25 - 2026-02-24
+Mickey 31 - 2026-03-13

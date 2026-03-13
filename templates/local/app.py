@@ -24,6 +24,8 @@ if not _IS_API_MODE:
     from strands.hooks import HookProvider, BeforeToolCallEvent, AfterToolCallEvent
     from agents import supervisor as sup_module
     from agents.supervisor import create_supervisor
+    # PYTHONPATH=/app/agents 경유로 임포트 (Agent 코드와 동일 모듈 인스턴스 공유)
+    from media_utils import flush as media_flush, extract_markdown_images
 
 
 # === 로컬 모드: ToolCallTracker ===
@@ -209,11 +211,30 @@ async def main(message: cl.Message):
     cl.user_session.set("_msg_counter", msg_id + 1)
     mid = f"msg-{msg_id}"
 
+    # 멀티모달 후처리: 사이드채널 + 마크다운 이미지 추출
+    elements = []
+    if not _IS_API_MODE:
+        # 1. 마크다운 이미지 (URL 기반) — 먼저 추출하여 content 정리
+        content, md_images = extract_markdown_images(content)
+        for i, img in enumerate(md_images):
+            name = img.get("caption") or f"md-image-{i}"
+            elements.append(cl.Image(url=img["url"], name=name, display="inline"))
+        # 2. 사이드채널 (로컬 생성 이미지)
+        flushed = media_flush()
+        for i, item in enumerate(flushed):
+            name = item.get("caption") or f"image-{i}"
+            if item.get("data"):
+                elements.append(cl.Image(content=item["data"], name=name, display="inline"))
+            elif item.get("path"):
+                elements.append(cl.Image(path=item["path"], name=name, display="inline"))
+            elif item.get("url"):
+                elements.append(cl.Image(url=item["url"], name=name, display="inline"))
+
     actions = [
         cl.Action(name="feedback_positive", payload={"mid": mid}, label="👍 좋아요"),
         cl.Action(name="feedback_negative", payload={"mid": mid}, label="👎 아쉬워요"),
     ]
-    msg = cl.Message(content=content, actions=actions)
+    msg = cl.Message(content=content, actions=actions, elements=elements)
     await msg.send()
 
     messages = cl.user_session.get("messages", {})
