@@ -105,6 +105,7 @@ kiro chat --agent agent-builder
 - **추론 과정 표시**: Strands Hooks로 도구 호출 자동 캡처 → 처리 과정 + 상세 보기
 - **피드백 버튼**: 👍/👎 cl.Action 버튼 → 로컬 JSON 저장 (AWS 시 S3)
 - **동적 환영 메시지**: supervisor.py의 ask_*_agent 도구 자동 감지
+- **멀티모달 출력**: Agent가 생성한 이미지(차트, 메트릭 등)를 인라인 렌더링 (사이드채널 + 마크다운 이미지)
 
 ### AWS 배포 (Hybrid Architecture)
 
@@ -283,6 +284,7 @@ aiops-starter-kit/
 │   │       ├── supervisor.py    # Multi-Agent 조율
 │   │       ├── guide_agent.py   # 프로젝트 가이드 챗봇
 │   │       ├── mcp_agent.py     # MCP 연동 예시 Agent
+│   │       ├── media_utils.py   # 멀티모달 출력 유틸리티 (사이드채널)
 │   │       ├── case_tools.py    # 사례 저장 도구
 │   │       ├── main.py          # AgentCore HTTP 서버
 │   │       ├── Dockerfile       # AgentCore 컨테이너 (ARM64)
@@ -491,6 +493,11 @@ chainlit run app.py
 - [x] 동적 환영 메시지 (supervisor의 ask_*_agent 자동 감지)
 - [x] 뉴스 Agent 시나리오 + 튜토리얼
 
+### v1.7 - 멀티모달 출력 지원 ✅
+- [x] 사이드채널 유틸리티 (media_utils.py: add_image/flush)
+- [x] 마크다운 이미지 추출 + cl.Image 인라인 렌더링
+- [x] Agent Builder 멀티모달 패턴 통합 (URL 이미지 + 생성 이미지)
+
 ### v2.0 - 자동화 워크플로우 (예정)
 - [ ] 스케줄러 (정기 분석)
 - [ ] 알림 연동 (Slack/이메일)
@@ -611,6 +618,7 @@ kiro chat --agent agent-builder
 ### v1.4 - Kiro CLI Agent Orchestration ✅
 ### v1.5 - MCP Integration ✅
 ### v1.6 - Template UI Improvements ✅
+### v1.7 - Multimodal Output ✅
 ### v2.0 - Automation Workflow (Planned)
 
 ---

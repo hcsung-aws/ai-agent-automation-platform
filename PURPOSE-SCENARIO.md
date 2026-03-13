@@ -40,14 +40,14 @@
 
 ## Acceptance Criteria
 
-- [ ] 처음 접하는 사용자가 README만 보고 로컬 실행까지 5분 이내
-- [ ] Agent Builder로 자연어 Agent 생성 → 테스트까지 15분 이내
-- [ ] 로컬 Agent를 AWS AgentCore에 배포까지 30분 이내
-- [ ] AWS 환경에서 신규 Agent 직접 생성/배포 가능
-- [ ] 피드백 루프가 로컬(JSON)/AWS(DynamoDB) 모두 동작
+- [x] 처음 접하는 사용자가 README만 보고 로컬 실행까지 5분 이내
+- [x] Agent Builder로 자연어 Agent 생성 → 테스트까지 15분 이내
+- [x] 로컬 Agent를 AWS AgentCore에 배포까지 30분 이내
+- [x] AWS 환경에서 신규 Agent 직접 생성/배포 가능
+- [x] 피드백 루프가 로컬(JSON)/AWS(DynamoDB) 모두 동작
 
 ## Last Confirmed
-2026-02-21 Mickey 24
+2026-03-13 Mickey 32
 
 ## Last Updated
-2026-02-21 Mickey 24
+2026-03-13 Mickey 32
